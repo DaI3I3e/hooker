@@ -1,0 +1,6 @@
+{
+  "name": "FinTrack v5",
+  "description": "برنامه مدیریت مالی شخصی",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,244 @@
+package com.example.ui.screens.transactions
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.example.data.local.entity.TransactionEntity
+import com.example.data.local.entity.TransactionType
+import com.example.data.local.relation.TransactionWithDetails
+import com.example.data.repository.TransactionRepository
+import com.example.util.JalaliDate
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+
+enum class DateFilterPeriod(val label: String) {
+    TODAY("امروز"),
+    WEEK("این هفته"),
+    MONTH("این ماه"),
+    CUSTOM("بازه دلخواه"),
+    ALL("همه زمان‌ها")
+}
+
+data class TransactionsUiState(
+    val selectedPeriod: DateFilterPeriod = DateFilterPeriod.ALL,
+    val selectedType: TransactionType? = null, // null means ALL
+    val selectedAccountId: Long? = null, // null means ALL ACCOUNTS
+    val searchQuery: String = "",
+    val isSearchActive: Boolean = false,
+    val isFullscreen: Boolean = false,
+    val zoomLevel: Float = 1.0f,
+    val accounts: List<com.example.data.local.entity.AccountEntity> = emptyList(),
+    val groupedTransactions: Map<String, List<TransactionWithDetails>> = emptyMap(),
+    val totalIncome: Long = 0L,
+    val totalExpense: Long = 0L,
+    val isLoading: Boolean = false
+)
+
+class TransactionsViewModel(
+    private val transactionRepository: TransactionRepository,
+    private val accountRepository: com.example.data.repository.AccountRepository
+) : ViewModel() {
+
+    private val _selectedPeriod = MutableStateFlow(DateFilterPeriod.ALL)
+    private val _selectedType = MutableStateFlow<TransactionType?>(null)
+    private val _selectedAccountId = MutableStateFlow<Long?>(null)
+    private val _searchQuery = MutableStateFlow("")
+    private val _isSearchActive = MutableStateFlow(false)
+    private val _customStartTimestamp = MutableStateFlow<Long?>(null)
+    private val _customEndTimestamp = MutableStateFlow<Long?>(null)
+    private val _isFullscreen = MutableStateFlow(false)
+    private val _zoomLevel = MutableStateFlow(1.0f)
+
+    private var recentlyDeletedTransaction: TransactionEntity? = null
+
+    val uiState: StateFlow<TransactionsUiState> = combine(
+        transactionRepository.allTransactionsWithDetails,
+        accountRepository.allAccounts,
+        _selectedPeriod,
+        _selectedType,
+        _selectedAccountId,
+        _searchQuery,
+        _isSearchActive,
+        _customStartTimestamp,
+        _customEndTimestamp,
+        _isFullscreen,
+        _zoomLevel
+    ) { flows: Array<Any?> ->
+        @Suppress("UNCHECKED_CAST")
+        val transactions = flows[0] as List<TransactionWithDetails>
+        @Suppress("UNCHECKED_CAST")
+        val accountsList = flows[1] as List<com.example.data.local.entity.AccountEntity>
+        val period = flows[2] as DateFilterPeriod
+        @Suppress("UNCHECKED_CAST")
+        val type = flows[3] as TransactionType?
+        val accountId = flows[4] as Long?
+        val query = flows[5] as String
+        val isSearch = flows[6] as Boolean
+        val customStart = flows[7] as Long?
+        val customEnd = flows[8] as Long?
+        val isFullscreen = flows[9] as Boolean
+        val zoom = flows[10] as Float
+
+        val zoneId = ZoneId.systemDefault()
+        val todayJalali = JalaliDate.today(zoneId)
+
+        val filtered = transactions.filter { tx ->
+            val date = tx.transaction.date
+            
+            // Date filter
+            val matchesPeriod = when (period) {
+                DateFilterPeriod.TODAY -> {
+                    date >= todayJalali.toStartOfDayTimestamp(zoneId) && date <= todayJalali.toEndOfDayTimestamp(zoneId)
+                }
+                DateFilterPeriod.WEEK -> {
+                    val startOfWeek = todayJalali.toStartOfDayTimestamp(zoneId) - (6 * 24 * 60 * 60 * 1000L)
+                    date >= startOfWeek
+                }
+                DateFilterPeriod.MONTH -> {
+                    val startOfMonth = JalaliDate.getStartOfCurrentMonth(zoneId)
+                    val endOfMonth = JalaliDate.getEndOfCurrentMonth(zoneId)
+                    date >= startOfMonth && date <= endOfMonth
+                }
+                DateFilterPeriod.CUSTOM -> {
+                    val s = customStart ?: 0L
+                    val e = customEnd ?: Long.MAX_VALUE
+                    date in s..e
+                }
+                DateFilterPeriod.ALL -> true
+            }
+
+            // Type filter
+            val matchesType = type == null || tx.transaction.type == type
+
+            // Account filter
+            val matchesAccount = accountId == null || tx.transaction.accountId == accountId || tx.transaction.toAccountId == accountId
+
+            // Search query filter
+            val matchesQuery = query.isBlank() || 
+                (tx.transaction.note?.contains(query, ignoreCase = true) == true) ||
+                (tx.categoryName?.contains(query, ignoreCase = true) == true) ||
+                (tx.accountName?.contains(query, ignoreCase = true) == true) ||
+                (tx.toAccountName?.contains(query, ignoreCase = true) == true)
+
+            matchesPeriod && matchesType && matchesAccount && matchesQuery
+        }
+
+        // Compute total income and expense for filtered list
+        var incomeSum = 0L
+        var expenseSum = 0L
+        filtered.forEach { item ->
+            when (item.transaction.type) {
+                TransactionType.INCOME -> incomeSum += item.transaction.amount
+                TransactionType.EXPENSE -> expenseSum += item.transaction.amount
+                TransactionType.TRANSFER -> {}
+            }
+        }
+
+        // Group by Jalali Date String
+        val grouped = filtered.groupBy { item ->
+            val jalali = JalaliDate.fromTimestamp(item.transaction.date, zoneId)
+            if (jalali == todayJalali) {
+                "امروز - ${jalali.format()}"
+            } else {
+                jalali.format(includeDayName = true)
+            }
+        }
+
+        TransactionsUiState(
+            selectedPeriod = period,
+            selectedType = type,
+            selectedAccountId = accountId,
+            searchQuery = query,
+            isSearchActive = isSearch,
+            isFullscreen = isFullscreen,
+            zoomLevel = zoom,
+            accounts = accountsList,
+            groupedTransactions = grouped,
+            totalIncome = incomeSum,
+            totalExpense = expenseSum
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = TransactionsUiState()
+    )
+
+    fun zoomIn() {
+        _zoomLevel.update { (it + 0.2f).coerceAtMost(2.0f) }
+    }
+
+    fun zoomOut() {
+        _zoomLevel.update { (it - 0.2f).coerceAtLeast(0.5f) }
+    }
+
+    fun setPeriod(period: DateFilterPeriod) {
+        _selectedPeriod.value = period
+    }
+
+    fun setCustomDateRange(start: Long, end: Long) {
+        _customStartTimestamp.value = start
+        _customEndTimestamp.value = end
+        _selectedPeriod.value = DateFilterPeriod.CUSTOM
+    }
+
+    fun setType(type: TransactionType?) {
+        _selectedType.value = type
+    }
+
+    fun setAccountFilter(accountId: Long?) {
+        _selectedAccountId.value = accountId
+    }
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun setSearchActive(active: Boolean) {
+        _isSearchActive.value = active
+        if (!active) {
+            _searchQuery.value = ""
+        }
+    }
+
+    fun toggleFullscreen() {
+        _isFullscreen.value = !_isFullscreen.value
+    }
+
+    fun setFullscreen(fullscreen: Boolean) {
+        _isFullscreen.value = fullscreen
+    }
+
+    fun deleteTransaction(transaction: TransactionEntity) {
+        recentlyDeletedTransaction = transaction
+        viewModelScope.launch {
+            transactionRepository.deleteTransaction(transaction)
+        }
+    }
+
+    fun undoDelete() {
+        recentlyDeletedTransaction?.let { deleted ->
+            viewModelScope.launch {
+                transactionRepository.insertTransaction(deleted)
+                recentlyDeletedTransaction = null
+            }
+        }
+    }
+
+    class Factory(
+        private val transactionRepository: TransactionRepository,
+        private val accountRepository: com.example.data.repository.AccountRepository
+    ) : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            return TransactionsViewModel(transactionRepository, accountRepository) as T
+        }
+    }
+}
