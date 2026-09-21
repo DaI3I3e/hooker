@@ -11,11 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalance
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -24,11 +20,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.R
 
 data class BankInfo(
@@ -48,7 +43,7 @@ object BankLogos {
             id = "melli",
             namePersian = "بانک ملی",
             nameEnglish = "Bank Melli Iran",
-            drawableRes = R.drawable.ic_bank_melli,
+            drawableRes = R.drawable.logo_bank_melli,
             color = 0xFF0066B3,
             secondaryColor = 0xFF003366,
             cardPrefixes = listOf("603799", "170019"),
@@ -58,7 +53,7 @@ object BankLogos {
             id = "mellat",
             namePersian = "بانک ملت",
             nameEnglish = "Bank Mellat",
-            drawableRes = R.drawable.ic_bank_mellat,
+            drawableRes = R.drawable.logo_bank_mellat,
             color = 0xFFBE1E2D,
             secondaryColor = 0xFFE30613,
             cardPrefixes = listOf("610433", "991975"),
@@ -68,7 +63,7 @@ object BankLogos {
             id = "saderat",
             namePersian = "بانک صادرات",
             nameEnglish = "Bank Saderat Iran",
-            drawableRes = R.drawable.ic_bank_saderat,
+            drawableRes = R.drawable.logo_bank_saderat,
             color = 0xFF192A56,
             secondaryColor = 0xFF273C75,
             cardPrefixes = listOf("603769", "903769"),
@@ -78,7 +73,7 @@ object BankLogos {
             id = "tejarat",
             namePersian = "بانک تجارت",
             nameEnglish = "Tejarat Bank",
-            drawableRes = R.drawable.ic_bank_tejarat,
+            drawableRes = R.drawable.logo_bank_tejarat,
             color = 0xFF005696,
             secondaryColor = 0xFF0984E3,
             cardPrefixes = listOf("585983", "627353"),
@@ -88,7 +83,7 @@ object BankLogos {
             id = "sepah",
             namePersian = "بانک سپه",
             nameEnglish = "Bank Sepah",
-            drawableRes = R.drawable.ic_bank_sepah,
+            drawableRes = R.drawable.logo_bank_sepah,
             color = 0xFFDAA520,
             secondaryColor = 0xFFB8860B,
             cardPrefixes = listOf("589210", "627381"),
@@ -98,7 +93,7 @@ object BankLogos {
             id = "keshavarzi",
             namePersian = "بانک کشاورزی",
             nameEnglish = "Keshavarzi Bank",
-            drawableRes = R.drawable.ic_bank_keshavarzi,
+            drawableRes = R.drawable.logo_bank_keshavarzi,
             color = 0xFF2E7D32,
             secondaryColor = 0xFF1B5E20,
             cardPrefixes = listOf("603770", "639217"),
@@ -108,7 +103,7 @@ object BankLogos {
             id = "maskan",
             namePersian = "بانک مسکن",
             nameEnglish = "Maskan Bank",
-            drawableRes = R.drawable.ic_bank_maskan,
+            drawableRes = R.drawable.logo_bank_maskan,
             color = 0xFFFF6F00,
             secondaryColor = 0xFFE65100,
             cardPrefixes = listOf("628023"),
@@ -118,7 +113,7 @@ object BankLogos {
             id = "saman",
             namePersian = "بانک سامان",
             nameEnglish = "Saman Bank",
-            drawableRes = R.drawable.ic_bank_saman,
+            drawableRes = R.drawable.logo_bank_saman,
             color = 0xFF0083CA,
             secondaryColor = 0xFF80D8FF,
             cardPrefixes = listOf("621986"),
@@ -128,7 +123,7 @@ object BankLogos {
             id = "parsian",
             namePersian = "بانک پارسیان",
             nameEnglish = "Parsian Bank",
-            drawableRes = R.drawable.ic_bank_parsian,
+            drawableRes = R.drawable.logo_bank_parsian,
             color = 0xFF8E0000,
             secondaryColor = 0xFF5C0000,
             cardPrefixes = listOf("622106", "639194", "627884"),
@@ -138,27 +133,27 @@ object BankLogos {
             id = "pasargad",
             namePersian = "بانک پاسارگاد",
             nameEnglish = "Pasargad Bank",
-            drawableRes = R.drawable.ic_bank_pasargad,
+            drawableRes = R.drawable.logo_bank_pasargad,
             color = 0xFF212121,
             secondaryColor = 0xFFFFD700,
             cardPrefixes = listOf("502229", "639347"),
             shortCode = "پاسارگاد"
         ),
         BankInfo(
-            id = "blubank",
-            namePersian = "بلو بانک",
-            nameEnglish = "Blu Bank",
-            drawableRes = R.drawable.ic_bank_blubank,
-            color = 0xFF007AFF,
-            secondaryColor = 0xFF5856D6,
-            cardPrefixes = listOf(),
-            shortCode = "بلو"
+            id = "refah",
+            namePersian = "بانک رفاه",
+            nameEnglish = "Refah Bank",
+            drawableRes = R.drawable.logo_bank_refah,
+            color = 0xFF00838F,
+            secondaryColor = 0xFF006064,
+            cardPrefixes = listOf("589463"),
+            shortCode = "رفاه"
         ),
         BankInfo(
             id = "resalat",
             namePersian = "بانک قرض‌الحسنه رسالت",
             nameEnglish = "Resalat Bank",
-            drawableRes = R.drawable.ic_bank_resalat,
+            drawableRes = R.drawable.logo_bank_resalat,
             color = 0xFF00796B,
             secondaryColor = 0xFF004D40,
             cardPrefixes = listOf("504172"),
@@ -168,17 +163,27 @@ object BankLogos {
             id = "mehr_iran",
             namePersian = "بانک مهر ایران",
             nameEnglish = "Qarz Al-Hasaneh Mehr Iran",
-            drawableRes = R.drawable.ic_bank_mehr_iran,
+            drawableRes = R.drawable.logo_bank_mehr_iran,
             color = 0xFF00897B,
             secondaryColor = 0xFF26A69A,
             cardPrefixes = listOf("606373"),
             shortCode = "مهر"
         ),
         BankInfo(
+            id = "sina",
+            namePersian = "بانک سینا",
+            nameEnglish = "Sina Bank",
+            drawableRes = R.drawable.logo_bank_sina,
+            color = 0xFF00695C,
+            secondaryColor = 0xFF004D40,
+            cardPrefixes = listOf("639346"),
+            shortCode = "سینا"
+        ),
+        BankInfo(
             id = "ayandeh",
             namePersian = "بانک آینده",
             nameEnglish = "Ayandeh Bank",
-            drawableRes = R.drawable.ic_bank_ayandeh,
+            drawableRes = R.drawable.ic_bank_default,
             color = 0xFF6D4C41,
             secondaryColor = 0xFF4E342E,
             cardPrefixes = listOf("636214"),
@@ -188,7 +193,7 @@ object BankLogos {
             id = "shahr",
             namePersian = "بانک شهر",
             nameEnglish = "Shahr Bank",
-            drawableRes = R.drawable.ic_bank_shahr,
+            drawableRes = R.drawable.ic_bank_default,
             color = 0xFFC62828,
             secondaryColor = 0xFFB71C1C,
             cardPrefixes = listOf("502806", "504706"),
@@ -198,21 +203,21 @@ object BankLogos {
             id = "dey",
             namePersian = "بانک دی",
             nameEnglish = "Dey Bank",
-            drawableRes = R.drawable.ic_bank_dey,
+            drawableRes = R.drawable.ic_bank_default,
             color = 0xFF6A1B9A,
             secondaryColor = 0xFF4A148C,
             cardPrefixes = listOf("502938"),
             shortCode = "دی"
         ),
         BankInfo(
-            id = "refah",
-            namePersian = "بانک رفاه",
-            nameEnglish = "Refah Bank",
-            drawableRes = R.drawable.ic_bank_refah,
-            color = 0xFF00838F,
-            secondaryColor = 0xFF006064,
-            cardPrefixes = listOf("589463"),
-            shortCode = "رفاه"
+            id = "blubank",
+            namePersian = "بلو بانک",
+            nameEnglish = "Blu Bank",
+            drawableRes = R.drawable.ic_bank_default,
+            color = 0xFF007AFF,
+            secondaryColor = 0xFF5856D6,
+            cardPrefixes = listOf(),
+            shortCode = "بلو"
         )
     )
 
@@ -282,22 +287,23 @@ fun BankLogoBadge(
         Box(
             modifier = modifier
                 .size(size)
-                .clip(RoundedCornerShape(shapeRadius))
+                .clip(CircleShape)
                 .background(Color.White)
                 .border(
                     width = 1.dp,
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(shapeRadius)
+                    shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
         ) {
             Image(
                 bitmap = bitmap,
                 contentDescription = accountName ?: "لوگوی حساب",
+                contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(3.dp)
-                    .clip(RoundedCornerShape(shapeRadius - 2.dp))
+                    .padding(2.dp)
+                    .clip(CircleShape)
             )
         }
         return
@@ -313,7 +319,7 @@ fun BankLogoBadge(
         Box(
             modifier = modifier
                 .size(size)
-                .clip(RoundedCornerShape(shapeRadius))
+                .clip(CircleShape)
                 .background(
                     Brush.linearGradient(
                         colors = listOf(primaryColor, secColor)
@@ -321,34 +327,52 @@ fun BankLogoBadge(
                 )
                 .border(
                     width = 1.dp,
-                    color = Color.White.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(shapeRadius)
+                    color = primaryColor.copy(alpha = 0.5f),
+                    shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Image(
-                painter = painterResource(id = detectedBank.drawableRes),
-                contentDescription = detectedBank.namePersian,
+            Box(
                 modifier = Modifier
-                    .size(size * 0.72f)
+                    .size(size * 0.82f)
                     .clip(CircleShape)
-            )
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = detectedBank.drawableRes),
+                    contentDescription = detectedBank.namePersian,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(2.dp)
+                        .clip(CircleShape)
+                )
+            }
         }
     } else {
         Box(
             modifier = modifier
                 .size(size)
-                .clip(RoundedCornerShape(shapeRadius))
-                .background(fallbackColor.copy(alpha = 0.15f)),
+                .clip(CircleShape)
+                .background(fallbackColor.copy(alpha = 0.12f))
+                .border(
+                    width = 1.dp,
+                    color = fallbackColor.copy(alpha = 0.25f),
+                    shape = CircleShape
+                ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.AccountBalance,
+            Image(
+                painter = painterResource(id = R.drawable.ic_bank_default),
                 contentDescription = accountName ?: "بانک",
-                tint = fallbackColor,
-                modifier = Modifier.size(size * 0.55f)
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .size(size * 0.65f)
+                    .clip(CircleShape)
             )
         }
     }
 }
+
 
