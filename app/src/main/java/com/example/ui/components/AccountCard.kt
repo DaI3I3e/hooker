@@ -2,11 +2,13 @@ package com.example.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -47,7 +49,7 @@ fun AccountCard(
 
     Card(
         modifier = modifier
-            .width(180.dp)
+            .width(200.dp)
             .shadow(
                 elevation = 2.dp,
                 shape = RoundedCornerShape(16.dp),
@@ -59,41 +61,36 @@ fun AccountCard(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
-        Row {
-            // Short colored bar on right (RTL start)
-            Box(
-                modifier = Modifier
-                    .width(6.dp)
-                    .height(96.dp)
-                    .background(cardColor)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BankLogoBadge(
+                bankId = account.logoResName,
+                logoImage = account.logoImage,
+                accountName = account.name,
+                cardNumber = account.cardNumber,
+                size = 64.dp,
+                shapeRadius = 16.dp,
+                fallbackColor = cardColor
             )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(12.dp)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    BankLogoBadge(
-                        bankId = account.logoResName,
-                        logoImage = account.logoImage,
-                        accountName = account.name,
-                        cardNumber = account.cardNumber,
-                        size = 34.dp,
-                        shapeRadius = 10.dp,
-                        fallbackColor = cardColor
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = account.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1
-                    )
-                }
-                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = account.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = "موجودی",
                     style = MaterialTheme.typography.labelSmall,
@@ -104,7 +101,8 @@ fun AccountCard(
                     text = AmountFormatter.format(accountWithBalance.currentBalance),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1
                 )
             }
         }

@@ -286,7 +286,7 @@ private fun ExtractedFieldRow(
         FieldType.TRANSACTION_TYPE, FieldType.SIGN -> MaterialTheme.colorScheme.primaryContainer
         FieldType.BANK_NAME -> MaterialTheme.colorScheme.secondaryContainer
         FieldType.ACCOUNT_IDENTIFIER -> MaterialTheme.colorScheme.tertiaryContainer
-        FieldType.DATE, FieldType.TIME, FieldType.TIME_HOUR, FieldType.TIME_MINUTE -> MaterialTheme.colorScheme.surfaceVariant
+        FieldType.DATE_YEAR, FieldType.DATE_MONTH, FieldType.DATE_DAY, FieldType.TIME_HOUR, FieldType.TIME_MINUTE -> MaterialTheme.colorScheme.surfaceVariant
         FieldType.IGNORE -> MaterialTheme.colorScheme.surface
         else -> MaterialTheme.colorScheme.surface
     }

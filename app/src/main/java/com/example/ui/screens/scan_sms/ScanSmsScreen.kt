@@ -264,29 +264,21 @@ fun ScanSmsScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(state.scannedList, key = { it.id }) { item ->
-                            if (item.isRecognized) {
-                                ScannedSmsCard(
-                                    item = item,
-                                    onAddClick = {
-                                        onNavigateToPreConfirm(
-                                            item.parsedSms.amount ?: 0L,
-                                            (item.parsedSms.transactionType ?: TransactionType.EXPENSE).name,
-                                            item.parsedSms.date ?: System.currentTimeMillis(),
-                                            item.parsedSms.bankName,
-                                            item.parsedSms.accountIdentifier,
-                                            item.smsHash,
-                                            item.parsedSms.rawDescription
-                                        )
-                                    }
-                                )
-                            } else {
-                                UnrecognizedSmsCard(
-                                    item = item,
-                                    onLearnPatternClick = {
-                                        onNavigateToPatternLearnerWithText(item.rawText)
-                                    }
-                                )
-                            }
+                            ScannedSmsCard(
+                                item = item,
+                                onAddClick = {
+                                    ScanSmsDataHolder.selectedItem = item
+                                    onNavigateToPreConfirm(
+                                        item.parsedSms.amount ?: 0L,
+                                        (item.parsedSms.transactionType ?: TransactionType.EXPENSE).name,
+                                        item.parsedSms.date ?: System.currentTimeMillis(),
+                                        item.parsedSms.bankName,
+                                        item.parsedSms.accountIdentifier,
+                                        item.smsHash,
+                                        item.parsedSms.rawDescription
+                                    )
+                                }
+                            )
                         }
                     }
                 }
@@ -341,6 +333,37 @@ fun ScannedSmsCard(
                             color = typeColor,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    // New (green) vs Registered (gray) Badge
+                    if (item.isRegistered) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "ثبت‌شده",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(IncomeColor.copy(alpha = 0.15f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "جدید",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = IncomeColor,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 

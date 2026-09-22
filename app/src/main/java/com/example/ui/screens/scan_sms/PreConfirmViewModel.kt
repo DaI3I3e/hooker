@@ -44,29 +44,58 @@ class PreConfirmViewModel(
     val uiState: StateFlow<PreConfirmUiState> = _uiState.asStateFlow()
 
     fun initData(
-        amount: Long,
-        typeStr: String,
-        date: Long,
-        bankName: String?,
-        accountIdent: String?,
-        smsHash: String,
-        note: String?
+        amount: Long = 0L,
+        typeStr: String = "EXPENSE",
+        date: Long = System.currentTimeMillis(),
+        bankName: String? = null,
+        accountIdent: String? = null,
+        smsHash: String = "",
+        note: String? = null
     ) {
+        val holderItem = ScanSmsDataHolder.selectedItem
+        val finalAmount = if (holderItem != null && holderItem.parsedSms.amount != null && holderItem.parsedSms.amount > 0L) {
+            holderItem.parsedSms.amount
+        } else amount
+
+        val finalTypeStr = if (holderItem != null) {
+            (holderItem.parsedSms.transactionType ?: TransactionType.EXPENSE).name
+        } else typeStr
+
+        val finalDate = if (holderItem != null && holderItem.parsedSms.date != null) {
+            holderItem.parsedSms.date
+        } else date
+
+        val finalBankName = if (holderItem != null) {
+            holderItem.parsedSms.bankName ?: bankName
+        } else bankName
+
+        val finalAccountIdent = if (holderItem != null) {
+            holderItem.parsedSms.accountIdentifier ?: accountIdent
+        } else accountIdent
+
+        val finalSmsHash = if (holderItem != null && holderItem.smsHash.isNotBlank()) {
+            holderItem.smsHash
+        } else smsHash
+
+        val finalNote = if (holderItem != null) {
+            holderItem.parsedSms.rawDescription ?: note
+        } else note
+
         val type = try {
-            TransactionType.valueOf(typeStr)
+            TransactionType.valueOf(finalTypeStr)
         } catch (e: Exception) {
             TransactionType.EXPENSE
         }
 
         _uiState.update {
             it.copy(
-                amount = amount,
+                amount = finalAmount,
                 transactionType = type,
-                dateTimestamp = date,
-                bankName = bankName?.ifBlank { null },
-                accountIdent = accountIdent?.ifBlank { null },
-                smsHash = smsHash,
-                note = note ?: ""
+                dateTimestamp = finalDate,
+                bankName = finalBankName?.ifBlank { null },
+                accountIdent = finalAccountIdent?.ifBlank { null },
+                smsHash = finalSmsHash,
+                note = finalNote ?: ""
             )
         }
 
@@ -74,22 +103,22 @@ class PreConfirmViewModel(
             val allAccs = accountRepository.allAccounts.first()
             var matchedAccount: AccountEntity? = null
 
-            if (!accountIdent.isNullOrBlank()) {
+            if (!finalAccountIdent.isNullOrBlank()) {
                 matchedAccount = allAccs.find { acc ->
-                    (acc.cardNumber != null && acc.cardNumber.contains(accountIdent)) ||
-                    (acc.shabaNumber != null && acc.shabaNumber.contains(accountIdent)) ||
-                    acc.name.contains(accountIdent)
+                    (acc.cardNumber != null && acc.cardNumber.contains(finalAccountIdent)) ||
+                    (acc.shabaNumber != null && acc.shabaNumber.contains(finalAccountIdent)) ||
+                    acc.name.contains(finalAccountIdent)
                 }
             }
 
-            if (matchedAccount == null && !bankName.isNullOrBlank()) {
+            if (matchedAccount == null && !finalBankName.isNullOrBlank()) {
                 matchedAccount = allAccs.find { acc ->
-                    acc.name.contains(bankName, ignoreCase = true) ||
-                    (bankName.contains("ملی") && acc.name.contains("ملی")) ||
-                    (bankName.contains("رسالت") && acc.name.contains("رسالت")) ||
-                    (bankName.contains("تجارت") && acc.name.contains("تجارت")) ||
-                    (bankName.contains("ملت") && acc.name.contains("ملت")) ||
-                    (bankName.contains("دی") && acc.name.contains("دی"))
+                    acc.name.contains(finalBankName, ignoreCase = true) ||
+                    (finalBankName.contains("ملی") && acc.name.contains("ملی")) ||
+                    (finalBankName.contains("رسالت") && acc.name.contains("رسالت")) ||
+                    (finalBankName.contains("تجارت") && acc.name.contains("تجارت")) ||
+                    (finalBankName.contains("ملت") && acc.name.contains("ملت")) ||
+                    (finalBankName.contains("دی") && acc.name.contains("دی"))
                 }
             }
 

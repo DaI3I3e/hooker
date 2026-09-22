@@ -24,15 +24,11 @@ object PatternExtractor {
             val tokensInLine = extractTokensFromLine(trimmedLine)
             for (token in tokensInLine) {
                 if (token.isNotBlank()) {
-                    val defaultType = when (token) {
-                        "+", "-" -> FieldType.SIGN
-                        else -> FieldType.IGNORE
-                    }
                     parts.add(
                         ExtractedField(
                             text = token,
                             lineIndex = lineIndex,
-                            fieldType = defaultType
+                            fieldType = FieldType.IGNORE
                         )
                     )
                 }

@@ -23,7 +23,8 @@ data class ScannedSmsItem(
     val rawText: String,
     val smsHash: String,
     val date: Long,
-    val isRecognized: Boolean = true
+    val isRecognized: Boolean = true,
+    val isRegistered: Boolean = false
 )
 
 data class ScanSmsUiState(
@@ -98,16 +99,15 @@ class ScanSmsViewModel(
                             val parsed = SmsParser.parse(body, patterns)
 
                             val amt = parsed.amount
-                            val bankName = parsed.bankName
-                            val isRecognized = (amt != null && amt > 0L && bankName != null)
+                            val isRecognized = (amt != null && amt > 0L)
 
                             if (isRecognized) {
                                 val smsDate = parsed.date ?: date
-                                val accountIdent = parsed.accountIdentifier ?: bankName
+                                val accountIdent = parsed.accountIdentifier ?: parsed.bankName ?: ""
 
-                                // Calculate hash and check duplicates
+                                // Calculate hash and check if registered
                                 val hash = "${amt}_${smsDate}_${accountIdent}"
-                                if (existingHashes.contains(hash)) continue
+                                val isRegistered = existingHashes.contains(hash)
 
                                 // Avoid duplicate within current scan list
                                 if (scannedResult.any { it.smsHash == hash }) continue
@@ -119,24 +119,10 @@ class ScanSmsViewModel(
                                         rawText = body,
                                         smsHash = hash,
                                         date = smsDate,
-                                        isRecognized = true
+                                        isRecognized = true,
+                                        isRegistered = isRegistered
                                     )
                                 )
-                            } else if (isPotentialBankSms(body)) {
-                                // Potential banking SMS with no matching pattern
-                                val hash = "unrecognized_${body.hashCode()}_${date}"
-                                if (scannedResult.none { it.rawText == body }) {
-                                    scannedResult.add(
-                                        ScannedSmsItem(
-                                            id = hash,
-                                            parsedSms = parsed,
-                                            rawText = body,
-                                            smsHash = hash,
-                                            date = date,
-                                            isRecognized = false
-                                        )
-                                    )
-                                }
                             }
                         }
                     }

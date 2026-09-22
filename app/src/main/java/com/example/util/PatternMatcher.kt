@@ -38,6 +38,9 @@ object PatternMatcher {
             var txType: TransactionType? = null
             var accountIdent: String? = null
             var dateStr: String? = null
+            var yearStr: String? = null
+            var monthStr: String? = null
+            var dayStr: String? = null
             var timeStr: String? = null
             var hourStr: String? = null
             var minStr: String? = null
@@ -83,25 +86,26 @@ object PatternMatcher {
                     }
                     FieldType.SIGN -> {
                         val token = currentToken.text
-                        if (token.contains("+")) {
+                        if (token.contains("+") || token.contains("واریز")) {
                             txType = TransactionType.INCOME
-                        } else if (token.contains("-")) {
+                        } else if (token.contains("-") || token.contains("برداشت")) {
                             txType = TransactionType.EXPENSE
                         }
                     }
-                    FieldType.DATE -> {
-                        val eng = convertToEnglish(currentToken.text)
-                        dateStr = if (dateStr == null) eng else "$dateStr/$eng"
+                    FieldType.DATE_YEAR -> {
+                        yearStr = convertToEnglish(currentToken.text).filter { it.isDigit() }
+                    }
+                    FieldType.DATE_MONTH -> {
+                        monthStr = convertToEnglish(currentToken.text).filter { it.isDigit() }
+                    }
+                    FieldType.DATE_DAY -> {
+                        dayStr = convertToEnglish(currentToken.text).filter { it.isDigit() }
                     }
                     FieldType.TIME_HOUR -> {
                         hourStr = convertToEnglish(currentToken.text).filter { it.isDigit() }
                     }
                     FieldType.TIME_MINUTE -> {
                         minStr = convertToEnglish(currentToken.text).filter { it.isDigit() }
-                    }
-                    FieldType.TIME -> {
-                        val eng = convertToEnglish(currentToken.text)
-                        timeStr = if (timeStr == null) eng else "$timeStr:$eng"
                     }
                     FieldType.DESCRIPTION -> {
                         description = if (description == null) currentToken.text else "$description ${currentToken.text}"
@@ -121,7 +125,15 @@ object PatternMatcher {
                     }
                 }
 
-                val timestamp = parseDateTimeToTimestamp(dateStr, timeStr, hourStr, minStr)
+                val timestamp = parseDateTimeToTimestamp(
+                    dateStr = dateStr,
+                    timeStr = timeStr,
+                    hourStr = hourStr,
+                    minStr = minStr,
+                    yearStr = yearStr,
+                    monthStr = monthStr,
+                    dayStr = dayStr
+                )
 
                 return ParsedSms(
                     bankName = bankName ?: pattern.bankName ?: "بانک",
@@ -151,9 +163,13 @@ object PatternMatcher {
         dateStr: String?,
         timeStr: String?,
         hourStr: String? = null,
-        minStr: String? = null
+        minStr: String? = null,
+        yearStr: String? = null,
+        monthStr: String? = null,
+        dayStr: String? = null
     ): Long {
-        if (dateStr.isNullOrBlank() && timeStr.isNullOrBlank() && hourStr.isNullOrBlank() && minStr.isNullOrBlank()) {
+        if (dateStr.isNullOrBlank() && timeStr.isNullOrBlank() && hourStr.isNullOrBlank() && minStr.isNullOrBlank()
+            && yearStr.isNullOrBlank() && monthStr.isNullOrBlank() && dayStr.isNullOrBlank()) {
             return System.currentTimeMillis()
         }
 
@@ -164,6 +180,19 @@ object PatternMatcher {
             var jYear = currentYear
             var jMonth = 1
             var jDay = 1
+
+            // If explicit year, month, or day provided
+            if (!yearStr.isNullOrBlank()) {
+                var y = yearStr.toIntOrNull() ?: currentYear
+                if (y < 100) y += 1400
+                jYear = y
+            }
+            if (!monthStr.isNullOrBlank()) {
+                jMonth = monthStr.toIntOrNull() ?: 1
+            }
+            if (!dayStr.isNullOrBlank()) {
+                jDay = dayStr.toIntOrNull() ?: 1
+            }
 
             val combinedStr = "${dateStr.orEmpty()} ${timeStr.orEmpty()}".trim()
             val eng = convertToEnglish(combinedStr)
@@ -177,33 +206,36 @@ object PatternMatcher {
                 }
             }
 
-            // 1. Full 4-digit year: YYYY/MM/DD or YYYY-MM-DD
-            val fullDateMatch = Regex("""(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})""").find(eng)
-            if (fullDateMatch != null) {
-                jYear = fullDateMatch.groupValues[1].toInt()
-                jMonth = fullDateMatch.groupValues[2].toInt()
-                jDay = fullDateMatch.groupValues[3].toInt()
-            } else {
-                // 2. 2-digit year: YY/MM/DD or YY-MM-DD
-                val shortYearMatch = Regex("""(\d{2})[/\-](\d{2})[/\-](\d{2})""").find(eng)
-                if (shortYearMatch != null) {
-                    var yy = shortYearMatch.groupValues[1].toInt()
-                    if (yy < 100) yy += 1400
-                    jYear = yy
-                    jMonth = shortYearMatch.groupValues[2].toInt()
-                    jDay = shortYearMatch.groupValues[3].toInt()
+            // If separate year/month/day were not provided, parse from dateStr/combinedStr
+            if (yearStr.isNullOrBlank() && monthStr.isNullOrBlank() && dayStr.isNullOrBlank()) {
+                // 1. Full 4-digit year: YYYY/MM/DD or YYYY-MM-DD
+                val fullDateMatch = Regex("""(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})""").find(eng)
+                if (fullDateMatch != null) {
+                    jYear = fullDateMatch.groupValues[1].toInt()
+                    jMonth = fullDateMatch.groupValues[2].toInt()
+                    jDay = fullDateMatch.groupValues[3].toInt()
                 } else {
-                    // 3. Month and Day: MM/DD or MM-DD
-                    val monthDayMatch = Regex("""(\d{1,2})[/\-](\d{1,2})""").find(eng)
-                    if (monthDayMatch != null) {
-                        jMonth = monthDayMatch.groupValues[1].toInt()
-                        jDay = monthDayMatch.groupValues[2].toInt()
+                    // 2. 2-digit year: YY/MM/DD or YY-MM-DD
+                    val shortYearMatch = Regex("""(\d{2})[/\-](\d{2})[/\-](\d{2})""").find(eng)
+                    if (shortYearMatch != null) {
+                        var yy = shortYearMatch.groupValues[1].toInt()
+                        if (yy < 100) yy += 1400
+                        jYear = yy
+                        jMonth = shortYearMatch.groupValues[2].toInt()
+                        jDay = shortYearMatch.groupValues[3].toInt()
                     } else {
-                        // 4. Raw MMDD (e.g. 0525-17:28)
-                        val rawMmDdMatch = Regex("""(\d{2})(\d{2})(?:[_\-]\d{1,2}:\d{2})?""").find(eng)
-                        if (rawMmDdMatch != null) {
-                            jMonth = rawMmDdMatch.groupValues[1].toInt()
-                            jDay = rawMmDdMatch.groupValues[2].toInt()
+                        // 3. Month and Day: MM/DD or MM-DD
+                        val monthDayMatch = Regex("""(\d{1,2})[/\-](\d{1,2})""").find(eng)
+                        if (monthDayMatch != null) {
+                            jMonth = monthDayMatch.groupValues[1].toInt()
+                            jDay = monthDayMatch.groupValues[2].toInt()
+                        } else {
+                            // 4. Raw MMDD (e.g. 0525-17:28)
+                            val rawMmDdMatch = Regex("""(\d{2})(\d{2})(?:[_\-]\d{1,2}:\d{2})?""").find(eng)
+                            if (rawMmDdMatch != null) {
+                                jMonth = rawMmDdMatch.groupValues[1].toInt()
+                                jDay = rawMmDdMatch.groupValues[2].toInt()
+                            }
                         }
                     }
                 }

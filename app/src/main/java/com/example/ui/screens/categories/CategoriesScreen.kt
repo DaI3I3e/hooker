@@ -149,7 +149,7 @@ fun CategoriesScreenContent(
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
+                    columns = GridCells.Adaptive(minSize = 240.dp),
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -194,59 +194,68 @@ fun CategoryGridCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .height(80.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = categoryColor.copy(alpha = 0.12f)
-        )
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            IconButton(
-                onClick = onToggleFavorite,
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(32.dp)
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(categoryColor),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (category.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                    contentDescription = if (category.isFavorite) "حذف از علاقه‌مندی" else "افزودن به علاقه‌مندی",
-                    tint = if (category.isFavorite) Color(0xFFFFB300) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.size(18.dp)
+                    imageVector = getCategoryIcon(category.icon),
+                    contentDescription = category.name,
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
                 )
             }
 
+            Spacer(modifier = Modifier.width(12.dp))
+
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 12.dp, start = 8.dp, end = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(categoryColor),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = getCategoryIcon(category.icon),
-                        contentDescription = category.name,
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
                 Text(
                     text = category.name,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = if (category.type == CategoryType.EXPENSE) "هزینه" else if (category.type == CategoryType.INCOME) "درآمد" else "هزینه و درآمد",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            IconButton(
+                onClick = onToggleFavorite,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = if (category.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                    contentDescription = if (category.isFavorite) "حذف از علاقه‌مندی" else "افزودن به علاقه‌مندی",
+                    tint = if (category.isFavorite) Color(0xFFFFB300) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
