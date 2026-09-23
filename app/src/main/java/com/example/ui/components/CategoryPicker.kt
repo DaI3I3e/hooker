@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,8 +41,22 @@ fun CategoryPicker(
     categories: List<CategoryEntity>,
     selectedCategoryId: Long?,
     onCategorySelected: (CategoryEntity) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier.height(200.dp)
 ) {
+    if (categories.isEmpty()) {
+        Box(
+            modifier = modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "دسته‌ای برای این بخش یافت نشد",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        return
+    }
+
     val sortedCategories = remember(categories) {
         categories.sortedWith(compareByDescending<CategoryEntity> { it.isFavorite }.thenBy { it.name })
     }

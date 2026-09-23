@@ -272,6 +272,7 @@ fun ScanSmsScreen(
                                 onAddClick = {
                                     try {
                                         sharedScanViewModel.setPendingScanItem(item)
+                                        ScanSmsDataHolder.selectedItem = item
                                         onNavigateToPreConfirm()
                                     } catch (e: Throwable) {
                                         android.util.Log.e("ScanSmsScreen", "Crash opening pre_confirm", e)

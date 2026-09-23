@@ -27,10 +27,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -82,7 +84,7 @@ fun PreConfirmScreen(
     }
 
     LaunchedEffect(pendingItem) {
-        viewModel.initFromItem(pendingItem)
+        viewModel.initFromItem(pendingItem ?: ScanSmsDataHolder.selectedItem)
     }
 
     LaunchedEffect(state.errorMessage) {
@@ -125,12 +127,6 @@ fun PreConfirmScreen(
     }
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-
-    LaunchedEffect(state.categories) {
-        if (state.categories.isNotEmpty()) {
-            listState.animateScrollToItem(2)
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -307,50 +303,63 @@ fun PreConfirmScreen(
                             fontWeight = FontWeight.Bold
                         )
 
-                        ExposedDropdownMenuBox(
-                            expanded = expanded,
-                            onExpandedChange = { expanded = !expanded }
-                        ) {
-                            OutlinedTextField(
-                                value = selectedAccount?.name ?: "انتخاب حساب...",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("حساب واریز/برداشت") },
-                                leadingIcon = {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { expanded = true },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     if (selectedAccount != null) {
                                         BankLogoBadge(
                                             bankId = selectedAccount.logoResName,
                                             accountName = selectedAccount.name,
                                             cardNumber = selectedAccount.cardNumber,
-                                            size = 24.dp,
+                                            size = 28.dp,
                                             shapeRadius = 6.dp
                                         )
                                     } else {
                                         Icon(
                                             imageVector = Icons.Default.AccountBalance,
-                                            contentDescription = null
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                                modifier = Modifier
-                                    .menuAnchor()
-                                    .fillMaxWidth()
-                            )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = selectedAccount?.name ?: "انتخاب حساب...",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
 
-                            ExposedDropdownMenu(
+                            DropdownMenu(
                                 expanded = expanded,
-                                onDismissRequest = { expanded = false }
+                                onDismissRequest = { expanded = false },
+                                modifier = Modifier.fillMaxWidth(0.9f)
                             ) {
                                 state.accounts.forEach { acc ->
                                     DropdownMenuItem(
-                                        text = { Text(acc.name) },
+                                        text = { Text(acc.name, fontWeight = FontWeight.Medium) },
                                         leadingIcon = {
                                             BankLogoBadge(
                                                 bankId = acc.logoResName,
                                                 accountName = acc.name,
                                                 cardNumber = acc.cardNumber,
-                                                size = 22.dp,
+                                                size = 24.dp,
                                                 shapeRadius = 6.dp
                                             )
                                         },
@@ -389,7 +398,10 @@ fun PreConfirmScreen(
                         CategoryPicker(
                             categories = state.categories,
                             selectedCategoryId = state.selectedCategoryId,
-                            onCategorySelected = { category -> viewModel.setSelectedCategory(category.id) }
+                            onCategorySelected = { category -> viewModel.setSelectedCategory(category.id) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
                         )
                     }
                 }
