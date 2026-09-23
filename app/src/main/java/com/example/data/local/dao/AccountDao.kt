@@ -18,10 +18,13 @@ interface AccountDao {
     @Update
     suspend fun update(account: AccountEntity)
 
+    @Update
+    suspend fun updateAll(accounts: List<AccountEntity>)
+
     @Delete
     suspend fun delete(account: AccountEntity)
 
-    @Query("SELECT * FROM accounts ORDER BY id ASC")
+    @Query("SELECT * FROM accounts ORDER BY sortOrder ASC, id ASC")
     fun getAll(): Flow<List<AccountEntity>>
 
     @Query("SELECT * FROM accounts WHERE id = :id")
@@ -59,7 +62,7 @@ interface AccountDao {
             SELECT COUNT(*) FROM transactions t WHERE t.accountId = a.id OR t.toAccountId = a.id
           ) AS transactionCount
         FROM accounts a
-        ORDER BY a.id ASC
+        ORDER BY a.sortOrder ASC, a.id ASC
     """)
     fun getAllWithBalance(): Flow<List<AccountWithBalance>>
 

@@ -3,6 +3,7 @@ package com.example.data.backup
 import com.example.data.local.FinTrackDatabase
 import com.example.data.local.entity.AccountEntity
 import com.example.data.local.entity.CategoryEntity
+import com.example.data.local.entity.SmsPatternEntity
 import com.example.data.local.entity.TransactionEntity
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -11,11 +12,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 data class BackupData(
-    val version: Int = 1,
+    val version: Int = 3,
     val timestamp: Long = System.currentTimeMillis(),
     val accounts: List<AccountEntity>,
     val categories: List<CategoryEntity>,
-    val transactions: List<TransactionEntity>
+    val transactions: List<TransactionEntity>,
+    val debts: List<com.example.data.local.entity.DebtEntity>? = null,
+    val sms_patterns: List<SmsPatternEntity>? = null
 )
 
 class BackupManager(private val database: FinTrackDatabase) {
@@ -25,13 +28,17 @@ class BackupManager(private val database: FinTrackDatabase) {
         val accounts = database.accountDao().getAll().first()
         val categories = database.categoryDao().getAll().first()
         val transactions = database.transactionDao().getAll().first()
+        val debts = database.debtDao().getAll().first()
+        val smsPatterns = database.smsPatternDao().getAll().first()
 
         val backupData = BackupData(
-            version = 1,
+            version = 3,
             timestamp = System.currentTimeMillis(),
             accounts = accounts,
             categories = categories,
-            transactions = transactions
+            transactions = transactions,
+            debts = debts,
+            sms_patterns = smsPatterns
         )
         gson.toJson(backupData)
     }
@@ -49,6 +56,18 @@ class BackupManager(private val database: FinTrackDatabase) {
                     backupData.accounts.forEach { database.accountDao().insert(it) }
                     database.categoryDao().insertAll(backupData.categories)
                     backupData.transactions.forEach { database.transactionDao().insert(it) }
+
+                    // Restore debts if present in backup
+                    backupData.debts?.let { debtList ->
+                        database.debtDao().deleteAll()
+                        debtList.forEach { database.debtDao().insert(it) }
+                    }
+
+                    // Restore SMS patterns if present in backup (graceful if absent)
+                    backupData.sms_patterns?.let { patterns ->
+                        database.smsPatternDao().deleteAll()
+                        patterns.forEach { database.smsPatternDao().insert(it) }
+                    }
                 }
             }
             true

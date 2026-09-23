@@ -36,21 +36,17 @@ sealed class Screen(val route: String) {
         }
     }
     object ScanSms : Screen("scan_sms")
-    object PreConfirm : Screen("pre_confirm?amount={amount}&type={type}&date={date}&bankName={bankName}&accountIdent={accountIdent}&smsHash={smsHash}&note={note}") {
+    object PreConfirm : Screen("pre_confirm")
+    object CategoryDetail : Screen("category_detail/{categoryId}?startDate={startDate}&endDate={endDate}&accountId={accountId}&type={type}") {
         fun createRoute(
-            amount: Long,
-            type: String,
-            date: Long,
-            bankName: String?,
-            accountIdent: String?,
-            smsHash: String,
-            note: String?
+            categoryId: Long,
+            startDate: Long = 0L,
+            endDate: Long = Long.MAX_VALUE,
+            accountId: Long? = null,
+            type: String = "EXPENSE"
         ): String {
-            val encBank = java.net.URLEncoder.encode(bankName ?: "", "UTF-8")
-            val encIdent = java.net.URLEncoder.encode(accountIdent ?: "", "UTF-8")
-            val encHash = java.net.URLEncoder.encode(smsHash, "UTF-8")
-            val encNote = java.net.URLEncoder.encode(note ?: "", "UTF-8")
-            return "pre_confirm?amount=$amount&type=$type&date=$date&bankName=$encBank&accountIdent=$encIdent&smsHash=$encHash&note=$encNote"
+            val accPart = if (accountId != null) "&accountId=$accountId" else ""
+            return "category_detail/$categoryId?startDate=$startDate&endDate=$endDate$accPart&type=$type"
         }
     }
     object Settings : Screen("settings")

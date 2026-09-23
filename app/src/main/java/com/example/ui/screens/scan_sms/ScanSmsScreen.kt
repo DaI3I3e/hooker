@@ -2,6 +2,8 @@ package com.example.ui.screens.scan_sms
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -68,8 +70,9 @@ import com.example.util.toPersianDigits
 @Composable
 fun ScanSmsScreen(
     viewModel: ScanSmsViewModel,
+    sharedScanViewModel: SharedScanViewModel,
     onNavigateBack: () -> Unit,
-    onNavigateToPreConfirm: (amount: Long, type: String, date: Long, bankName: String?, accountIdent: String?, smsHash: String, note: String?) -> Unit,
+    onNavigateToPreConfirm: () -> Unit,
     onNavigateToPatternLearnerWithText: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -267,16 +270,13 @@ fun ScanSmsScreen(
                             ScannedSmsCard(
                                 item = item,
                                 onAddClick = {
-                                    ScanSmsDataHolder.selectedItem = item
-                                    onNavigateToPreConfirm(
-                                        item.parsedSms.amount ?: 0L,
-                                        (item.parsedSms.transactionType ?: TransactionType.EXPENSE).name,
-                                        item.parsedSms.date ?: System.currentTimeMillis(),
-                                        item.parsedSms.bankName,
-                                        item.parsedSms.accountIdentifier,
-                                        item.smsHash,
-                                        item.parsedSms.rawDescription
-                                    )
+                                    try {
+                                        sharedScanViewModel.setPendingScanItem(item)
+                                        onNavigateToPreConfirm()
+                                    } catch (e: Throwable) {
+                                        android.util.Log.e("ScanSmsScreen", "Crash opening pre_confirm", e)
+                                        Toast.makeText(context, "خطا در باز کردن صفحه", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             )
                         }

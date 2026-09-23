@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
         com.example.data.local.entity.DebtEntity::class,
         com.example.data.local.entity.SmsPatternEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class FinTrackDatabase : RoomDatabase() {
@@ -48,6 +48,12 @@ abstract class FinTrackDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE accounts ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getInstance(context: Context): FinTrackDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -55,7 +61,7 @@ abstract class FinTrackDatabase : RoomDatabase() {
                     FinTrackDatabase::class.java,
                     Constants.DATABASE_NAME
                 )
-                .addMigrations(MIGRATION_4_5)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigration()
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {

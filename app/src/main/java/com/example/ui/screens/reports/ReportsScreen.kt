@@ -2,6 +2,7 @@ package com.example.ui.screens.reports
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,6 +67,7 @@ import androidx.compose.runtime.setValue
 @Composable
 fun ReportsScreen(
     viewModel: ReportsViewModel,
+    onCategoryClick: ((categoryId: Long, startDate: Long, endDate: Long, accountId: Long?, type: String) -> Unit)? = null,
     onToggleFullscreen: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -116,41 +118,41 @@ fun ReportsScreen(
                 .padding(innerPadding)
         ) {
             if (!state.isFullscreen) {
-                // Period Selection Tabs
-                TabRow(
-                    selectedTabIndex = ReportPeriod.entries.indexOf(state.selectedPeriod),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                ) {
-                    ReportPeriod.entries.forEach { period ->
-                        val selected = state.selectedPeriod == period
-                        Tab(
-                            selected = selected,
-                            onClick = {
-                                if (period == ReportPeriod.CUSTOM) {
-                                    showDateRangePicker = true
-                                } else {
-                                    viewModel.setPeriod(period)
-                                }
-                            },
-                            text = {
-                                Text(
-                                    text = period.label,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        )
-                    }
+                // Compact Filter Bar (Period | Account | Category)
+                val periodLabel = when (state.selectedPeriod) {
+                    ReportPeriod.TODAY -> "امروز"
+                    ReportPeriod.WEEK -> "هفته اخیر"
+                    ReportPeriod.MONTH -> "ماه جاری"
+                    ReportPeriod.ALL -> "همه زمان‌ها"
+                    ReportPeriod.CUSTOM -> "دلخواه"
                 }
+                com.example.ui.components.CompactFilterBar(
+                    periodLabel = periodLabel,
+                    isPeriodActive = state.selectedPeriod != ReportPeriod.ALL,
+                    onSelectPeriod = { key ->
+                        val period = when (key) {
+                            "TODAY" -> ReportPeriod.TODAY
+                            "WEEK" -> ReportPeriod.WEEK
+                            "MONTH" -> ReportPeriod.MONTH
+                            "ALL" -> ReportPeriod.ALL
+                            else -> ReportPeriod.ALL
+                        }
+                        viewModel.setPeriod(period)
+                    },
+                    onRequestCustomDate = { showDateRangePicker = true },
+                    accounts = state.accounts,
+                    selectedAccountId = state.selectedAccountId,
+                    onSelectAccount = { viewModel.setAccountFilter(it) },
+                    categories = state.categories,
+                    selectedCategoryId = state.selectedCategoryId,
+                    onSelectCategory = { viewModel.setCategoryFilter(it) }
+                )
 
                 // Income vs Expense Report Toggle
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FilterChip(
@@ -174,31 +176,6 @@ fun ReportsScreen(
                         ),
                         modifier = Modifier.weight(1f)
                     )
-                }
-
-                // Account Filter Chips
-                if (state.accounts.isNotEmpty()) {
-                    androidx.compose.foundation.lazy.LazyRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        item {
-                            androidx.compose.material3.FilterChip(
-                                selected = state.selectedAccountId == null,
-                                onClick = { viewModel.setAccountFilter(null) },
-                                label = { Text("همه حساب‌ها") }
-                            )
-                        }
-                        items(state.accounts, key = { it.id }) { acc ->
-                            androidx.compose.material3.FilterChip(
-                                selected = state.selectedAccountId == acc.id,
-                                onClick = { viewModel.setAccountFilter(acc.id) },
-                                label = { Text(acc.name) }
-                            )
-                        }
-                    }
                 }
             }
 
@@ -307,7 +284,18 @@ fun ReportsScreen(
                     }
                 } else {
                     items(state.categorySummaries, key = { it.category.id }) { summary ->
-                        CategorySummaryItem(summary = summary)
+                        CategorySummaryItem(
+                            summary = summary,
+                            onClick = {
+                                onCategoryClick?.invoke(
+                                    summary.category.id,
+                                    state.currentStartTimestamp,
+                                    state.currentEndTimestamp,
+                                    state.selectedAccountId,
+                                    state.selectedReportType.name
+                                )
+                            }
+                        )
                     }
                 }
             }
@@ -462,6 +450,7 @@ fun DonutChart(
 @Composable
 fun CategorySummaryItem(
     summary: CategorySummary,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val categoryColor = Color(summary.category.color)
@@ -469,7 +458,9 @@ fun CategorySummaryItem(
     val countText = "${summary.transactionCount}".toPersianDigits() + " تراکنش"
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface

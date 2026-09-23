@@ -209,41 +209,28 @@ fun TransactionsScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 if (!state.isFullscreen) {
-                    // Date Filter Tabs (Today / Week / Month / All)
-                    TabRow(
-                        selectedTabIndex = DateFilterPeriod.entries.indexOf(state.selectedPeriod),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                    ) {
-                        DateFilterPeriod.entries.forEach { period ->
-                            val selected = state.selectedPeriod == period
-                            Tab(
-                                selected = selected,
-                                onClick = {
-                                    if (period == DateFilterPeriod.CUSTOM) {
-                                        showDateRangePicker = true
-                                    } else {
-                                        viewModel.setPeriod(period)
-                                    }
-                                },
-                                text = {
-                                    Text(
-                                        text = period.label,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                }
-                            )
-                        }
-                    }
+                    // Compact Filter Bar (Period | Account | Category)
+                    com.example.ui.components.CompactFilterBar(
+                        periodLabel = state.selectedPeriod.label,
+                        isPeriodActive = state.selectedPeriod != DateFilterPeriod.ALL,
+                        onSelectPeriod = { key ->
+                            val period = DateFilterPeriod.valueOf(key)
+                            viewModel.setPeriod(period)
+                        },
+                        onRequestCustomDate = { showDateRangePicker = true },
+                        accounts = state.accounts,
+                        selectedAccountId = state.selectedAccountId,
+                        onSelectAccount = { viewModel.setAccountFilter(it) },
+                        categories = state.categories,
+                        selectedCategoryId = state.selectedCategoryId,
+                        onSelectCategory = { viewModel.setCategoryFilter(it) }
+                    )
 
                     // Type Filter Chips (All / Expense / Income / Transfer)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         FilterChip(
@@ -278,31 +265,6 @@ fun TransactionsScreen(
                                 selectedLabelColor = TransferColor
                             )
                         )
-                    }
-
-                    // Account Filter Chips
-                    if (state.accounts.isNotEmpty()) {
-                        androidx.compose.foundation.lazy.LazyRow(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            item {
-                                FilterChip(
-                                    selected = state.selectedAccountId == null,
-                                    onClick = { viewModel.setAccountFilter(null) },
-                                    label = { Text("همه حساب‌ها") }
-                                )
-                            }
-                            items(state.accounts, key = { it.id }) { acc ->
-                                FilterChip(
-                                    selected = state.selectedAccountId == acc.id,
-                                    onClick = { viewModel.setAccountFilter(acc.id) },
-                                    label = { Text(acc.name) }
-                                )
-                            }
-                        }
                     }
                 }
 

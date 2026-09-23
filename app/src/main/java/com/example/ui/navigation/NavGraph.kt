@@ -88,6 +88,9 @@ import com.example.ui.screens.scan_sms.PreConfirmScreen
 import com.example.ui.screens.scan_sms.PreConfirmViewModel
 import com.example.ui.screens.scan_sms.ScanSmsScreen
 import com.example.ui.screens.scan_sms.ScanSmsViewModel
+import com.example.ui.screens.scan_sms.SharedScanViewModel
+import com.example.ui.screens.reports.CategoryDetailScreen
+import com.example.ui.screens.reports.CategoryDetailViewModel
 import com.example.ui.screens.pattern_learner.SmsPatternLearnerScreen
 import com.example.ui.screens.pattern_learner.SmsPatternLearnerViewModel
 import com.example.ui.theme.ExpenseColor
@@ -106,6 +109,7 @@ fun NavGraph(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    val sharedScanViewModel: SharedScanViewModel = viewModel()
     var showFabBottomSheet by remember { mutableStateOf(false) }
     var isFullscreenMode by remember { mutableStateOf(false) }
 
@@ -505,11 +509,10 @@ fun NavGraph(
                 )
                 ScanSmsScreen(
                     viewModel = viewModel,
+                    sharedScanViewModel = sharedScanViewModel,
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToPreConfirm = { amt, type, date, bank, ident, hash, note ->
-                        navController.navigate(
-                            Screen.PreConfirm.createRoute(amt, type, date, bank, ident, hash, note)
-                        )
+                    onNavigateToPreConfirm = {
+                        navController.navigate(Screen.PreConfirm.route)
                     },
                     onNavigateToPatternLearnerWithText = { text ->
                         navController.navigate(Screen.PatternLearner.createRoute(null, text))
@@ -517,26 +520,7 @@ fun NavGraph(
                 )
             }
 
-            composable(
-                route = Screen.PreConfirm.route,
-                arguments = listOf(
-                    navArgument("amount") { type = NavType.LongType },
-                    navArgument("type") { type = NavType.StringType },
-                    navArgument("date") { type = NavType.LongType },
-                    navArgument("bankName") { type = NavType.StringType; nullable = true; defaultValue = "" },
-                    navArgument("accountIdent") { type = NavType.StringType; nullable = true; defaultValue = "" },
-                    navArgument("smsHash") { type = NavType.StringType },
-                    navArgument("note") { type = NavType.StringType; nullable = true; defaultValue = "" }
-                )
-            ) { backStackEntry ->
-                val amount = backStackEntry.arguments?.getLong("amount") ?: 0L
-                val type = backStackEntry.arguments?.getString("type") ?: "EXPENSE"
-                val date = backStackEntry.arguments?.getLong("date") ?: System.currentTimeMillis()
-                val bankName = backStackEntry.arguments?.getString("bankName")
-                val accountIdent = backStackEntry.arguments?.getString("accountIdent")
-                val smsHash = backStackEntry.arguments?.getString("smsHash") ?: ""
-                val note = backStackEntry.arguments?.getString("note")
-
+            composable(Screen.PreConfirm.route) {
                 val viewModel: PreConfirmViewModel = viewModel(
                     factory = PreConfirmViewModel.Factory(
                         accountRepository = app.appModule.accountRepository,
@@ -547,13 +531,7 @@ fun NavGraph(
 
                 PreConfirmScreen(
                     viewModel = viewModel,
-                    amount = amount,
-                    typeStr = type,
-                    date = date,
-                    bankName = bankName,
-                    accountIdent = accountIdent,
-                    smsHash = smsHash,
-                    note = note,
+                    sharedScanViewModel = sharedScanViewModel,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
@@ -587,7 +565,8 @@ fun NavGraph(
                 val viewModel: TransactionsViewModel = viewModel(
                     factory = TransactionsViewModel.Factory(
                         transactionRepository = app.appModule.transactionRepository,
-                        accountRepository = app.appModule.accountRepository
+                        accountRepository = app.appModule.accountRepository,
+                        categoryRepository = app.appModule.categoryRepository
                     )
                 )
                 TransactionsScreen(
@@ -640,12 +619,60 @@ fun NavGraph(
                 val viewModel: ReportsViewModel = viewModel(
                     factory = ReportsViewModel.Factory(
                         transactionRepository = app.appModule.transactionRepository,
-                        accountRepository = app.appModule.accountRepository
+                        accountRepository = app.appModule.accountRepository,
+                        categoryRepository = app.appModule.categoryRepository
                     )
                 )
                 ReportsScreen(
                     viewModel = viewModel,
-                    onToggleFullscreen = { isFullscreenMode = it }
+                    onToggleFullscreen = { isFullscreenMode = it },
+                    onCategoryClick = { categoryId, start, end, accId, typeStr ->
+                        navController.navigate(
+                            Screen.CategoryDetail.createRoute(
+                                categoryId = categoryId,
+                                startDate = start,
+                                endDate = end,
+                                accountId = accId,
+                                type = typeStr
+                            )
+                        )
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.CategoryDetail.route,
+                arguments = listOf(
+                    navArgument("categoryId") { type = NavType.LongType },
+                    navArgument("startDate") { type = NavType.LongType; defaultValue = 0L },
+                    navArgument("endDate") { type = NavType.LongType; defaultValue = Long.MAX_VALUE },
+                    navArgument("accountId") { type = NavType.LongType; defaultValue = -1L },
+                    navArgument("type") { type = NavType.StringType; defaultValue = "EXPENSE" }
+                )
+            ) { backStackEntry ->
+                val categoryId = backStackEntry.arguments?.getLong("categoryId") ?: return@composable
+                val startDate = backStackEntry.arguments?.getLong("startDate") ?: 0L
+                val endDate = backStackEntry.arguments?.getLong("endDate") ?: Long.MAX_VALUE
+                val rawAccountId = backStackEntry.arguments?.getLong("accountId") ?: -1L
+                val accountId = if (rawAccountId > 0) rawAccountId else null
+                val typeStr = backStackEntry.arguments?.getString("type") ?: "EXPENSE"
+                val reportType = if (typeStr == "INCOME") com.example.data.local.entity.TransactionType.INCOME else com.example.data.local.entity.TransactionType.EXPENSE
+
+                val viewModel: CategoryDetailViewModel = viewModel(
+                    factory = CategoryDetailViewModel.Factory(
+                        categoryId = categoryId,
+                        startDate = startDate,
+                        endDate = endDate,
+                        accountId = accountId,
+                        reportType = reportType,
+                        categoryRepository = app.appModule.categoryRepository,
+                        transactionRepository = app.appModule.transactionRepository,
+                        accountRepository = app.appModule.accountRepository
+                    )
+                )
+                CategoryDetailScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
 
@@ -677,12 +704,9 @@ fun NavGraph(
                         smsPatternRepository = app.appModule.smsPatternRepository
                     )
                 )
-                val categoriesViewModel: CategoriesViewModel = viewModel(
-                    factory = CategoriesViewModel.Factory(app.appModule.categoryRepository)
-                )
                 AccountsScreen(
-                    accountsViewModel = accountsViewModel,
-                    categoriesViewModel = categoriesViewModel,
+                    viewModel = accountsViewModel,
+                    onNavigateBack = { navController.popBackStack() },
                     onNavigateToAddAccount = {
                         navController.navigate(Screen.AddAccount.createRoute(null))
                     },
@@ -691,12 +715,6 @@ fun NavGraph(
                     },
                     onNavigateToAccountDetails = { accountId ->
                         navController.navigate(Screen.AccountDetails.createRoute(accountId))
-                    },
-                    onNavigateToAddCategory = { type ->
-                        navController.navigate(Screen.AddCategory.createRoute(null, type))
-                    },
-                    onNavigateToEditCategory = { categoryId, type ->
-                        navController.navigate(Screen.AddCategory.createRoute(categoryId, type))
                     },
                     onNavigateToPatternLearner = { accountId ->
                         navController.navigate(Screen.PatternLearner.createRoute(accountId))
@@ -753,8 +771,9 @@ fun NavGraph(
                 val viewModel: CategoriesViewModel = viewModel(
                     factory = CategoriesViewModel.Factory(app.appModule.categoryRepository)
                 )
-                com.example.ui.screens.categories.CategoriesScreenContent(
+                com.example.ui.screens.categories.CategoriesScreen(
                     viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() },
                     onNavigateToAddCategory = { type: String ->
                         navController.navigate(Screen.AddCategory.createRoute(null, type))
                     },

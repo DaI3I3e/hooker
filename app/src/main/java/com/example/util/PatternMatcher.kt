@@ -30,8 +30,8 @@ object PatternMatcher {
             }
             if (savedFields.isEmpty()) continue
 
-            // 1. Structure check: token count within +/- 3
-            if (Math.abs(savedFields.size - currentTokens.size) > 3) continue
+            // 1. Structure check: token count must match closely (at most difference of 1)
+            if (Math.abs(savedFields.size - currentTokens.size) > 1) continue
 
             var bankName: String? = pattern.bankName
             var amount: Long? = null
@@ -45,6 +45,7 @@ object PatternMatcher {
             var hourStr: String? = null
             var minStr: String? = null
             var description: String? = null
+            var hasMatchingFailure = false
 
             // 2. Read each fieldType and map corresponding token
             for (i in savedFields.indices) {
@@ -52,11 +53,15 @@ object PatternMatcher {
                 val fieldType = savedField.fieldType ?: FieldType.IGNORE
                 if (fieldType == FieldType.IGNORE) continue
 
-                // Find corresponding token in currentTokens at position +/- 1
+                // Find corresponding token in currentTokens at position
                 val currentToken = currentTokens.getOrNull(i)
                     ?: currentTokens.getOrNull(i - 1)
                     ?: currentTokens.getOrNull(i + 1)
-                    ?: continue
+
+                if (currentToken == null) {
+                    hasMatchingFailure = true
+                    break
+                }
 
                 when (fieldType) {
                     FieldType.BANK_NAME -> {
@@ -74,6 +79,10 @@ object PatternMatcher {
                         val parsedAmt = cleanedNum.toLongOrNull()
                         if (parsedAmt != null && parsedAmt > 0L) {
                             amount = parsedAmt
+                        } else {
+                            // Expected amount here but token is not a number! Structure mismatch
+                            hasMatchingFailure = true
+                            break
                         }
                     }
                     FieldType.TRANSACTION_TYPE -> {
@@ -115,16 +124,14 @@ object PatternMatcher {
                 }
             }
 
-            if (amount != null && amount > 0L) {
-                if (txType == null) {
-                    val englishSms = convertToEnglish(smsText)
-                    txType = if (englishSms.contains("واریز") || englishSms.contains("حقوق") || englishSms.contains("+")) {
-                        TransactionType.INCOME
-                    } else {
-                        TransactionType.EXPENSE
-                    }
-                }
+            if (hasMatchingFailure) continue
 
+            val hasDateFields = !dateStr.isNullOrBlank() || !timeStr.isNullOrBlank() ||
+                !yearStr.isNullOrBlank() || !monthStr.isNullOrBlank() || !dayStr.isNullOrBlank() ||
+                !hourStr.isNullOrBlank() || !minStr.isNullOrBlank()
+
+            // Strict requirements: amount > 0, transaction type non-null, valid date
+            if (amount != null && amount > 0L && txType != null && hasDateFields) {
                 val timestamp = parseDateTimeToTimestamp(
                     dateStr = dateStr,
                     timeStr = timeStr,
@@ -135,14 +142,16 @@ object PatternMatcher {
                     dayStr = dayStr
                 )
 
-                return ParsedSms(
-                    bankName = bankName ?: pattern.bankName ?: "بانک",
-                    transactionType = txType,
-                    amount = amount,
-                    date = timestamp,
-                    accountIdentifier = accountIdent ?: pattern.accountIdentifier.ifBlank { null },
-                    rawDescription = description ?: (if (txType == TransactionType.INCOME) "واریز" else "برداشت")
-                )
+                if (timestamp != null) {
+                    return ParsedSms(
+                        bankName = bankName ?: pattern.bankName ?: "بانک",
+                        transactionType = txType,
+                        amount = amount,
+                        date = timestamp,
+                        accountIdentifier = accountIdent ?: pattern.accountIdentifier.ifBlank { null },
+                        rawDescription = description ?: (if (txType == TransactionType.INCOME) "واریز" else "برداشت")
+                    )
+                }
             }
         }
 
@@ -167,10 +176,10 @@ object PatternMatcher {
         yearStr: String? = null,
         monthStr: String? = null,
         dayStr: String? = null
-    ): Long {
+    ): Long? {
         if (dateStr.isNullOrBlank() && timeStr.isNullOrBlank() && hourStr.isNullOrBlank() && minStr.isNullOrBlank()
             && yearStr.isNullOrBlank() && monthStr.isNullOrBlank() && dayStr.isNullOrBlank()) {
-            return System.currentTimeMillis()
+            return null
         }
 
         try {
@@ -247,7 +256,7 @@ object PatternMatcher {
                 .toInstant()
                 .toEpochMilli()
         } catch (e: Exception) {
-            return System.currentTimeMillis()
+            return null
         }
     }
 }

@@ -3,7 +3,13 @@ package com.example.ui.screens.reports
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.data.local.entity.AccountEntity
+import com.example.data.local.entity.CategoryEntity
+import com.example.data.local.entity.CategoryType
 import com.example.data.local.entity.TransactionType
+import com.example.data.local.relation.TransactionWithDetails
+import com.example.data.repository.AccountRepository
+import com.example.data.repository.CategoryRepository
 import com.example.data.repository.TransactionRepository
 import com.example.domain.model.CategorySummary
 import com.example.util.JalaliDate
@@ -12,38 +18,43 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import java.time.ZoneId
 
-enum class ReportPeriod(val label: String) {
-    TODAY("امروز"),
-    WEEK("این هفته"),
-    MONTH("این ماه"),
-    ALL("همه زمان‌ها"),
-    CUSTOM("بازه دلخواه")
+enum class ReportPeriod {
+    TODAY,
+    WEEK,
+    MONTH,
+    ALL,
+    CUSTOM
 }
 
 data class ReportsUiState(
     val selectedPeriod: ReportPeriod = ReportPeriod.MONTH,
     val selectedAccountId: Long? = null,
+    val selectedCategoryId: Long? = null,
     val selectedReportType: TransactionType = TransactionType.EXPENSE,
     val isFullscreen: Boolean = false,
-    val accounts: List<com.example.data.local.entity.AccountEntity> = emptyList(),
+    val accounts: List<AccountEntity> = emptyList(),
+    val categories: List<CategoryEntity> = emptyList(),
     val totalIncome: Long = 0L,
     val totalExpense: Long = 0L,
     val netBalance: Long = 0L,
     val categorySummaries: List<CategorySummary> = emptyList(),
+    val currentStartTimestamp: Long = 0L,
+    val currentEndTimestamp: Long = Long.MAX_VALUE,
     val isLoading: Boolean = false
 )
 
 class ReportsViewModel(
     private val transactionRepository: TransactionRepository,
-    private val accountRepository: com.example.data.repository.AccountRepository
+    private val accountRepository: AccountRepository,
+    private val categoryRepository: CategoryRepository
 ) : ViewModel() {
 
     private val _selectedPeriod = MutableStateFlow(ReportPeriod.MONTH)
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
+    private val _selectedCategoryId = MutableStateFlow<Long?>(null)
     private val _selectedReportType = MutableStateFlow(TransactionType.EXPENSE)
     private val _customStartTimestamp = MutableStateFlow<Long?>(null)
     private val _customEndTimestamp = MutableStateFlow<Long?>(null)
@@ -53,23 +64,28 @@ class ReportsViewModel(
     val uiState: StateFlow<ReportsUiState> = combine(
         _selectedPeriod,
         _selectedAccountId,
+        _selectedCategoryId,
         _selectedReportType,
         _customStartTimestamp,
         _customEndTimestamp,
         _isFullscreen,
         accountRepository.allAccounts,
+        categoryRepository.allCategories,
         transactionRepository.allTransactionsWithDetails
     ) { flows: Array<Any?> ->
         val period = flows[0] as ReportPeriod
         val accountId = flows[1] as Long?
-        val reportType = flows[2] as TransactionType
-        val customStart = flows[3] as Long?
-        val customEnd = flows[4] as Long?
-        val isFullscreen = flows[5] as Boolean
+        val categoryId = flows[2] as Long?
+        val reportType = flows[3] as TransactionType
+        val customStart = flows[4] as Long?
+        val customEnd = flows[5] as Long?
+        val isFullscreen = flows[6] as Boolean
         @Suppress("UNCHECKED_CAST")
-        val accountsList = flows[6] as List<com.example.data.local.entity.AccountEntity>
+        val accountsList = flows[7] as List<AccountEntity>
         @Suppress("UNCHECKED_CAST")
-        val allTxWithDetails = flows[7] as List<com.example.data.local.relation.TransactionWithDetails>
+        val categoriesList = flows[8] as List<CategoryEntity>
+        @Suppress("UNCHECKED_CAST")
+        val allTxWithDetails = flows[9] as List<TransactionWithDetails>
 
         val zoneId = ZoneId.systemDefault()
         val todayJalali = JalaliDate.today(zoneId)
@@ -100,7 +116,8 @@ class ReportsViewModel(
             val d = item.transaction.date
             val inDateRange = d in start..end
             val inAccount = (accountId == null || item.transaction.accountId == accountId || item.transaction.toAccountId == accountId)
-            inDateRange && inAccount
+            val inCategory = (categoryId == null || item.transaction.categoryId == categoryId)
+            inDateRange && inAccount && inCategory
         }
 
         var incomeSum = 0L
@@ -120,14 +137,13 @@ class ReportsViewModel(
             }
 
             if (tx.type == reportType) {
-                tx.categoryId?.let { catId ->
-                    categoryAmountMap[catId] = (categoryAmountMap[catId] ?: 0L) + tx.amount
-                    categoryCountMap[catId] = (categoryCountMap[catId] ?: 0) + 1
-                    if (!categoryNameMap.containsKey(catId)) {
-                        categoryNameMap[catId] = item.categoryName ?: "سایر"
-                        categoryColorMap[catId] = item.categoryColor ?: 0xFF757575.toInt()
-                        categoryIconMap[catId] = item.categoryIcon ?: "more_horiz"
-                    }
+                val catId = tx.categoryId ?: 0L
+                categoryAmountMap[catId] = (categoryAmountMap[catId] ?: 0L) + tx.amount
+                categoryCountMap[catId] = (categoryCountMap[catId] ?: 0) + 1
+                if (!categoryNameMap.containsKey(catId)) {
+                    categoryNameMap[catId] = item.categoryName ?: "سایر"
+                    categoryColorMap[catId] = item.categoryColor ?: 0xFF757575.toInt()
+                    categoryIconMap[catId] = item.categoryIcon ?: "more_horiz"
                 }
             }
         }
@@ -137,10 +153,10 @@ class ReportsViewModel(
         val summaries = categoryAmountMap.map { (catId, totalAmt) ->
             val percentage = if (totalForType > 0) (totalAmt.toDouble() / totalForType * 100).toFloat() else 0f
             CategorySummary(
-                category = com.example.data.local.entity.CategoryEntity(
+                category = CategoryEntity(
                     id = catId,
                     name = categoryNameMap[catId] ?: "سایر",
-                    type = if (reportType == TransactionType.EXPENSE) com.example.data.local.entity.CategoryType.EXPENSE else com.example.data.local.entity.CategoryType.INCOME,
+                    type = if (reportType == TransactionType.EXPENSE) CategoryType.EXPENSE else CategoryType.INCOME,
                     color = categoryColorMap[catId] ?: 0xFF757575.toInt(),
                     icon = categoryIconMap[catId] ?: "more_horiz"
                 ),
@@ -153,13 +169,17 @@ class ReportsViewModel(
         ReportsUiState(
             selectedPeriod = period,
             selectedAccountId = accountId,
+            selectedCategoryId = categoryId,
             selectedReportType = reportType,
             isFullscreen = isFullscreen,
             accounts = accountsList,
+            categories = categoriesList,
             totalIncome = incomeSum,
             totalExpense = expenseSum,
             netBalance = incomeSum - expenseSum,
             categorySummaries = summaries,
+            currentStartTimestamp = start,
+            currentEndTimestamp = end,
             isLoading = false
         )
     }.stateIn(
@@ -182,6 +202,10 @@ class ReportsViewModel(
         _selectedAccountId.value = accountId
     }
 
+    fun setCategoryFilter(categoryId: Long?) {
+        _selectedCategoryId.value = categoryId
+    }
+
     fun setReportType(type: TransactionType) {
         _selectedReportType.value = type
     }
@@ -196,11 +220,12 @@ class ReportsViewModel(
 
     class Factory(
         private val transactionRepository: TransactionRepository,
-        private val accountRepository: com.example.data.repository.AccountRepository
+        private val accountRepository: AccountRepository,
+        private val categoryRepository: CategoryRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return ReportsViewModel(transactionRepository, accountRepository) as T
+            return ReportsViewModel(transactionRepository, accountRepository, categoryRepository) as T
         }
     }
 }

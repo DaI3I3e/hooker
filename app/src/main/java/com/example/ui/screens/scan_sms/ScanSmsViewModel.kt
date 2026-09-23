@@ -98,11 +98,13 @@ class ScanSmsViewModel(
                             // 2. Parse SMS with custom learned patterns
                             val parsed = SmsParser.parse(body, patterns)
 
+                            // Strict check: only include SMS where amount, date, and transactionType are all non-null and amount > 0
                             val amt = parsed.amount
-                            val isRecognized = (amt != null && amt > 0L)
+                            val smsDate = parsed.date
+                            val txType = parsed.transactionType
+                            val isStrictlyMatched = (amt != null && amt > 0L && smsDate != null && txType != null)
 
-                            if (isRecognized) {
-                                val smsDate = parsed.date ?: date
+                            if (isStrictlyMatched) {
                                 val accountIdent = parsed.accountIdentifier ?: parsed.bankName ?: ""
 
                                 // Calculate hash and check if registered
@@ -115,7 +117,7 @@ class ScanSmsViewModel(
                                 scannedResult.add(
                                     ScannedSmsItem(
                                         id = hash,
-                                        parsedSms = parsed.copy(date = smsDate),
+                                        parsedSms = parsed,
                                         rawText = body,
                                         smsHash = hash,
                                         date = smsDate,

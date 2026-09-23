@@ -23,6 +23,10 @@ class AccountRepository(private val accountDao: AccountDao) {
         accountDao.update(account)
     }
 
+    suspend fun updateAccounts(accounts: List<AccountEntity>) = withContext(Dispatchers.IO) {
+        accountDao.updateAll(accounts)
+    }
+
     suspend fun deleteAccount(account: AccountEntity) = withContext(Dispatchers.IO) {
         accountDao.delete(account)
     }

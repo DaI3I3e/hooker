@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.MailOutline
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RemoveCircle
@@ -36,15 +37,20 @@ import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.core.animateFloatAsState
@@ -58,6 +64,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.AccountCard
 import com.example.ui.components.BalanceCard
@@ -68,6 +75,7 @@ import com.example.ui.theme.IncomeColor
 import com.example.ui.theme.TransferColor
 import com.example.util.AmountFormatter
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
@@ -84,6 +92,65 @@ fun DashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val summary by viewModel.uiState.collectAsStateWithLifecycle()
+    var showMoreBottomSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+
+    if (showMoreBottomSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showMoreBottomSheet = false },
+            sheetState = sheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = "سایر دسترسی‌ها",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    QuickAccessItem(
+                        title = "گزارش‌ها",
+                        icon = Icons.Default.BarChart,
+                        color = Color(0xFF388E3C),
+                        onClick = {
+                            showMoreBottomSheet = false
+                            onNavigateToReports()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    QuickAccessItem(
+                        title = "ورود پیامک",
+                        icon = Icons.Default.MailOutline,
+                        color = Color(0xFFE91E63),
+                        onClick = {
+                            showMoreBottomSheet = false
+                            onNavigateToImportSms()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    QuickAccessItem(
+                        title = "تنظیمات",
+                        icon = Icons.Default.Settings,
+                        color = Color(0xFF757575),
+                        onClick = {
+                            showMoreBottomSheet = false
+                            onNavigateToSettings()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(28.dp))
+            }
+        }
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -141,7 +208,7 @@ fun DashboardScreen(
             }
         }
 
-        // Quick Access (دسترسی سریع) 4-column Grid
+        // Quick Access (دسترسی سریع) 4-column Grid (2 rows)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -160,9 +227,9 @@ fun DashboardScreen(
                         text = "دسترسی سریع",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     // Row 1: ثبت هزینه (قرمز)، ثبت درآمد (سبز)، انتقال (آبی)، اسکن پیامک (فیروزه‌ای)
                     Row(
@@ -199,9 +266,9 @@ fun DashboardScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // Row 2: حساب‌ها (آبی)، دسته‌بندی‌ها (بنفش)، بدهی و طلب (نارنجی)، گزارش‌ها (سبز)
+                    // Row 2: حساب‌ها (آبی)، دسته‌بندی‌ها (بنفش)، بدهی و طلب (نارنجی)، سایر... (خاکستری)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceAround
@@ -228,37 +295,12 @@ fun DashboardScreen(
                             modifier = Modifier.weight(1f)
                         )
                         QuickAccessItem(
-                            title = "گزارش‌ها",
-                            icon = Icons.Default.BarChart,
-                            color = Color(0xFF388E3C),
-                            onClick = onNavigateToReports,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Row 3: وارد کردن پیامک (صورتی)، تنظیمات (خاکستری)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        QuickAccessItem(
-                            title = "وارد کردن پیامک",
-                            icon = Icons.Default.MailOutline,
-                            color = Color(0xFFE91E63),
-                            onClick = onNavigateToImportSms,
-                            modifier = Modifier.weight(1f)
-                        )
-                        QuickAccessItem(
-                            title = "تنظیمات",
-                            icon = Icons.Default.Settings,
+                            title = "سایر...",
+                            icon = Icons.Default.MoreHoriz,
                             color = Color(0xFF757575),
-                            onClick = onNavigateToSettings,
+                            onClick = { showMoreBottomSheet = true },
                             modifier = Modifier.weight(1f)
                         )
-                        Spacer(modifier = Modifier.weight(1f))
-                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -347,11 +389,11 @@ fun QuickAccessItem(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 6.dp, horizontal = 2.dp)
+            .padding(vertical = 4.dp, horizontal = 2.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(46.dp)
+                .size(42.dp)
                 .clip(CircleShape)
                 .background(color.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
@@ -360,16 +402,20 @@ fun QuickAccessItem(
                 imageVector = icon,
                 contentDescription = title,
                 tint = color,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(22.dp)
             )
         }
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 10.sp,
+                lineHeight = 13.sp
+            ),
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface
         )
     }

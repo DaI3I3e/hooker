@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -59,6 +60,40 @@ import com.example.data.local.entity.CategoryType
 import com.example.ui.components.getCategoryIcon
 import com.example.ui.theme.ExpenseColor
 import com.example.ui.theme.IncomeColor
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CategoriesScreen(
+    viewModel: CategoriesViewModel,
+    onNavigateBack: () -> Unit,
+    onNavigateToAddCategory: (String) -> Unit,
+    onNavigateToEditCategory: (Long, String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("دسته‌بندی‌ها", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "بازگشت"
+                        )
+                    }
+                }
+            )
+        },
+        modifier = modifier
+    ) { innerPadding ->
+        CategoriesScreenContent(
+            viewModel = viewModel,
+            onNavigateToAddCategory = onNavigateToAddCategory,
+            onNavigateToEditCategory = onNavigateToEditCategory,
+            modifier = Modifier.padding(innerPadding)
+        )
+    }
+}
 
 @Composable
 fun CategoriesScreenContent(

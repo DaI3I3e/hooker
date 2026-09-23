@@ -38,6 +38,32 @@ class AccountsViewModel(
         }
     }
 
+    fun moveAccountUp(item: AccountWithBalance) {
+        val currentList = accountsWithBalance.value
+        val index = currentList.indexOfFirst { it.account.id == item.account.id }
+        if (index > 0) {
+            val prev = currentList[index - 1]
+            val updatedCurrent = item.account.copy(sortOrder = index - 1)
+            val updatedPrev = prev.account.copy(sortOrder = index)
+            viewModelScope.launch {
+                accountRepository.updateAccounts(listOf(updatedCurrent, updatedPrev))
+            }
+        }
+    }
+
+    fun moveAccountDown(item: AccountWithBalance) {
+        val currentList = accountsWithBalance.value
+        val index = currentList.indexOfFirst { it.account.id == item.account.id }
+        if (index in 0 until currentList.size - 1) {
+            val next = currentList[index + 1]
+            val updatedCurrent = item.account.copy(sortOrder = index + 1)
+            val updatedNext = next.account.copy(sortOrder = index)
+            viewModelScope.launch {
+                accountRepository.updateAccounts(listOf(updatedCurrent, updatedNext))
+            }
+        }
+    }
+
     class Factory(
         private val accountRepository: AccountRepository,
         private val smsPatternRepository: SmsPatternRepository

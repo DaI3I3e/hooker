@@ -3,9 +3,13 @@ package com.example.ui.screens.transactions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.data.local.entity.AccountEntity
+import com.example.data.local.entity.CategoryEntity
 import com.example.data.local.entity.TransactionEntity
 import com.example.data.local.entity.TransactionType
 import com.example.data.local.relation.TransactionWithDetails
+import com.example.data.repository.AccountRepository
+import com.example.data.repository.CategoryRepository
 import com.example.data.repository.TransactionRepository
 import com.example.util.JalaliDate
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,29 +17,28 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 
 enum class DateFilterPeriod(val label: String) {
     TODAY("امروز"),
-    WEEK("این هفته"),
-    MONTH("این ماه"),
-    CUSTOM("بازه دلخواه"),
-    ALL("همه زمان‌ها")
+    WEEK("هفته"),
+    MONTH("ماه"),
+    ALL("همه"),
+    CUSTOM("دلخواه")
 }
 
 data class TransactionsUiState(
     val selectedPeriod: DateFilterPeriod = DateFilterPeriod.ALL,
     val selectedType: TransactionType? = null, // null means ALL
     val selectedAccountId: Long? = null, // null means ALL ACCOUNTS
+    val selectedCategoryId: Long? = null, // null means ALL CATEGORIES
     val searchQuery: String = "",
     val isSearchActive: Boolean = false,
     val isFullscreen: Boolean = false,
     val zoomLevel: Float = 1.0f,
-    val accounts: List<com.example.data.local.entity.AccountEntity> = emptyList(),
+    val accounts: List<AccountEntity> = emptyList(),
+    val categories: List<CategoryEntity> = emptyList(),
     val groupedTransactions: Map<String, List<TransactionWithDetails>> = emptyMap(),
     val totalIncome: Long = 0L,
     val totalExpense: Long = 0L,
@@ -44,12 +47,14 @@ data class TransactionsUiState(
 
 class TransactionsViewModel(
     private val transactionRepository: TransactionRepository,
-    private val accountRepository: com.example.data.repository.AccountRepository
+    private val accountRepository: AccountRepository,
+    private val categoryRepository: CategoryRepository
 ) : ViewModel() {
 
     private val _selectedPeriod = MutableStateFlow(DateFilterPeriod.ALL)
     private val _selectedType = MutableStateFlow<TransactionType?>(null)
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
+    private val _selectedCategoryId = MutableStateFlow<Long?>(null)
     private val _searchQuery = MutableStateFlow("")
     private val _isSearchActive = MutableStateFlow(false)
     private val _customStartTimestamp = MutableStateFlow<Long?>(null)
@@ -62,9 +67,11 @@ class TransactionsViewModel(
     val uiState: StateFlow<TransactionsUiState> = combine(
         transactionRepository.allTransactionsWithDetails,
         accountRepository.allAccounts,
+        categoryRepository.allCategories,
         _selectedPeriod,
         _selectedType,
         _selectedAccountId,
+        _selectedCategoryId,
         _searchQuery,
         _isSearchActive,
         _customStartTimestamp,
@@ -75,24 +82,27 @@ class TransactionsViewModel(
         @Suppress("UNCHECKED_CAST")
         val transactions = flows[0] as List<TransactionWithDetails>
         @Suppress("UNCHECKED_CAST")
-        val accountsList = flows[1] as List<com.example.data.local.entity.AccountEntity>
-        val period = flows[2] as DateFilterPeriod
+        val accountsList = flows[1] as List<AccountEntity>
         @Suppress("UNCHECKED_CAST")
-        val type = flows[3] as TransactionType?
-        val accountId = flows[4] as Long?
-        val query = flows[5] as String
-        val isSearch = flows[6] as Boolean
-        val customStart = flows[7] as Long?
-        val customEnd = flows[8] as Long?
-        val isFullscreen = flows[9] as Boolean
-        val zoom = flows[10] as Float
+        val categoriesList = flows[2] as List<CategoryEntity>
+        val period = flows[3] as DateFilterPeriod
+        @Suppress("UNCHECKED_CAST")
+        val type = flows[4] as TransactionType?
+        val accountId = flows[5] as Long?
+        val categoryId = flows[6] as Long?
+        val query = flows[7] as String
+        val isSearch = flows[8] as Boolean
+        val customStart = flows[9] as Long?
+        val customEnd = flows[10] as Long?
+        val isFullscreen = flows[11] as Boolean
+        val zoom = flows[12] as Float
 
         val zoneId = ZoneId.systemDefault()
         val todayJalali = JalaliDate.today(zoneId)
 
         val filtered = transactions.filter { tx ->
             val date = tx.transaction.date
-            
+
             // Date filter
             val matchesPeriod = when (period) {
                 DateFilterPeriod.TODAY -> {
@@ -121,14 +131,17 @@ class TransactionsViewModel(
             // Account filter
             val matchesAccount = accountId == null || tx.transaction.accountId == accountId || tx.transaction.toAccountId == accountId
 
+            // Category filter
+            val matchesCategory = categoryId == null || tx.transaction.categoryId == categoryId
+
             // Search query filter
-            val matchesQuery = query.isBlank() || 
+            val matchesQuery = query.isBlank() ||
                 (tx.transaction.note?.contains(query, ignoreCase = true) == true) ||
                 (tx.categoryName?.contains(query, ignoreCase = true) == true) ||
                 (tx.accountName?.contains(query, ignoreCase = true) == true) ||
                 (tx.toAccountName?.contains(query, ignoreCase = true) == true)
 
-            matchesPeriod && matchesType && matchesAccount && matchesQuery
+            matchesPeriod && matchesType && matchesAccount && matchesCategory && matchesQuery
         }
 
         // Compute total income and expense for filtered list
@@ -156,28 +169,23 @@ class TransactionsViewModel(
             selectedPeriod = period,
             selectedType = type,
             selectedAccountId = accountId,
+            selectedCategoryId = categoryId,
             searchQuery = query,
             isSearchActive = isSearch,
             isFullscreen = isFullscreen,
             zoomLevel = zoom,
             accounts = accountsList,
+            categories = categoriesList,
             groupedTransactions = grouped,
             totalIncome = incomeSum,
-            totalExpense = expenseSum
+            totalExpense = expenseSum,
+            isLoading = false
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = TransactionsUiState()
+        initialValue = TransactionsUiState(isLoading = true)
     )
-
-    fun zoomIn() {
-        _zoomLevel.update { (it + 0.2f).coerceAtMost(2.0f) }
-    }
-
-    fun zoomOut() {
-        _zoomLevel.update { (it - 0.2f).coerceAtLeast(0.5f) }
-    }
 
     fun setPeriod(period: DateFilterPeriod) {
         _selectedPeriod.value = period
@@ -195,6 +203,22 @@ class TransactionsViewModel(
 
     fun setAccountFilter(accountId: Long?) {
         _selectedAccountId.value = accountId
+    }
+
+    fun setCategoryFilter(categoryId: Long?) {
+        _selectedCategoryId.value = categoryId
+    }
+
+    fun setZoomLevel(zoom: Float) {
+        _zoomLevel.value = zoom.coerceIn(0.7f, 1.5f)
+    }
+
+    fun zoomIn() {
+        setZoomLevel(_zoomLevel.value + 0.1f)
+    }
+
+    fun zoomOut() {
+        setZoomLevel(_zoomLevel.value - 0.1f)
     }
 
     fun setSearchQuery(query: String) {
@@ -234,11 +258,12 @@ class TransactionsViewModel(
 
     class Factory(
         private val transactionRepository: TransactionRepository,
-        private val accountRepository: com.example.data.repository.AccountRepository
+        private val accountRepository: AccountRepository,
+        private val categoryRepository: CategoryRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return TransactionsViewModel(transactionRepository, accountRepository) as T
+            return TransactionsViewModel(transactionRepository, accountRepository, categoryRepository) as T
         }
     }
 }

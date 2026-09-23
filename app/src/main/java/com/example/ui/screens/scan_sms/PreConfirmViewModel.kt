@@ -43,6 +43,73 @@ class PreConfirmViewModel(
     private val _uiState = MutableStateFlow(PreConfirmUiState())
     val uiState: StateFlow<PreConfirmUiState> = _uiState.asStateFlow()
 
+    fun initFromItem(item: ScannedSmsItem?) {
+        if (item == null) return
+        val finalAmount = item.parsedSms.amount ?: 0L
+        val type = item.parsedSms.transactionType ?: TransactionType.EXPENSE
+        val finalDate = item.parsedSms.date ?: item.date
+        val finalBankName = item.parsedSms.bankName
+        val finalAccountIdent = item.parsedSms.accountIdentifier
+        val finalSmsHash = item.smsHash
+        val finalNote = item.parsedSms.rawDescription ?: ""
+
+        _uiState.update {
+            it.copy(
+                amount = finalAmount,
+                transactionType = type,
+                dateTimestamp = finalDate,
+                bankName = finalBankName?.ifBlank { null },
+                accountIdent = finalAccountIdent?.ifBlank { null },
+                smsHash = finalSmsHash,
+                note = finalNote
+            )
+        }
+
+        viewModelScope.launch {
+            val allAccs = accountRepository.allAccounts.first()
+            var matchedAccount: AccountEntity? = null
+
+            if (!finalAccountIdent.isNullOrBlank()) {
+                matchedAccount = allAccs.find { acc ->
+                    (acc.cardNumber != null && acc.cardNumber.contains(finalAccountIdent)) ||
+                    (acc.shabaNumber != null && acc.shabaNumber.contains(finalAccountIdent)) ||
+                    acc.name.contains(finalAccountIdent)
+                }
+            }
+
+            if (matchedAccount == null && !finalBankName.isNullOrBlank()) {
+                matchedAccount = allAccs.find { acc ->
+                    acc.name.contains(finalBankName, ignoreCase = true) ||
+                    (finalBankName.contains("ملی") && acc.name.contains("ملی")) ||
+                    (finalBankName.contains("رسالت") && acc.name.contains("رسالت")) ||
+                    (finalBankName.contains("تجارت") && acc.name.contains("تجارت")) ||
+                    (finalBankName.contains("ملت") && acc.name.contains("ملت")) ||
+                    (finalBankName.contains("دی") && acc.name.contains("دی"))
+                }
+            }
+
+            val defaultAccId = matchedAccount?.id ?: allAccs.firstOrNull()?.id
+
+            val allCats = categoryRepository.allCategories.first()
+            val filteredCats = allCats.filter {
+                when (type) {
+                    TransactionType.EXPENSE -> it.type == CategoryType.EXPENSE || it.type == CategoryType.BOTH
+                    TransactionType.INCOME -> it.type == CategoryType.INCOME || it.type == CategoryType.BOTH
+                    else -> true
+                }
+            }
+
+            _uiState.update {
+                it.copy(
+                    accounts = allAccs,
+                    selectedAccountId = defaultAccId,
+                    categories = filteredCats,
+                    selectedCategoryId = filteredCats.firstOrNull()?.id
+                )
+            }
+        }
+    }
+
     fun initData(
         amount: Long = 0L,
         typeStr: String = "EXPENSE",

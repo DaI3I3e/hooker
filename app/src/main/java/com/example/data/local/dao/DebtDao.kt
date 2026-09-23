@@ -35,4 +35,7 @@ interface DebtDao {
 
     @Query("SELECT COALESCE(SUM(amount), 0) FROM debts WHERE type = 'I_OWE' AND isSettled = 0")
     fun getTotalIOwe(): Flow<Long>
+
+    @Query("DELETE FROM debts")
+    suspend fun deleteAll()
 }

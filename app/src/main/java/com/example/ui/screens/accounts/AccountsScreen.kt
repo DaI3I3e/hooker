@@ -17,16 +17,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pattern
-import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,12 +39,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,34 +52,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.entity.AccountEntity
 import com.example.data.local.entity.AccountType
-import com.example.data.local.entity.SmsPatternEntity
 import com.example.data.local.relation.AccountWithBalance
-import com.example.ui.components.AccountIconDisplay
-import com.example.ui.screens.categories.CategoriesViewModel
 import com.example.util.AmountFormatter
 import com.example.util.BankLogoBadge
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountsScreen(
-    accountsViewModel: AccountsViewModel,
-    categoriesViewModel: CategoriesViewModel,
+    viewModel: AccountsViewModel,
+    onNavigateBack: () -> Unit,
     onNavigateToAddAccount: () -> Unit,
     onNavigateToEditAccount: (Long) -> Unit,
     onNavigateToAccountDetails: (Long) -> Unit,
-    onNavigateToAddCategory: (String) -> Unit,
-    onNavigateToEditCategory: (Long, String) -> Unit,
     onNavigateToPatternLearner: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    var mainTabSelected by remember { mutableStateOf(0) } // 0: Accounts, 1: Categories
-    val accounts by accountsViewModel.accountsWithBalance.collectAsStateWithLifecycle()
-    val patterns by accountsViewModel.allPatterns.collectAsStateWithLifecycle()
+    val accounts by viewModel.accountsWithBalance.collectAsStateWithLifecycle()
+    val patterns by viewModel.allPatterns.collectAsStateWithLifecycle()
     var accountToDelete by remember { mutableStateOf<AccountEntity?>(null) }
 
     if (accountToDelete != null) {
@@ -94,7 +87,7 @@ fun AccountsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        accountToDelete?.let { accountsViewModel.deleteAccount(it) }
+                        accountToDelete?.let { viewModel.deleteAccount(it) }
                         accountToDelete = null
                     }
                 ) {
@@ -112,24 +105,26 @@ fun AccountsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("مدیریت حساب‌ها و دسته‌ها", fontWeight = FontWeight.Bold) }
+                title = { Text("حساب‌ها", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "بازگشت"
+                        )
+                    }
+                }
             )
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = {
-                    if (mainTabSelected == 0) {
-                        onNavigateToAddAccount()
-                    } else {
-                        onNavigateToAddCategory("EXPENSE")
-                    }
-                },
+                onClick = onNavigateToAddAccount,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = if (mainTabSelected == 0) "افزودن حساب" else "افزودن دسته‌بندی"
+                    contentDescription = "افزودن حساب"
                 )
             }
         },
@@ -140,83 +135,50 @@ fun AccountsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Main Top Tabs
-            TabRow(
-                selectedTabIndex = mainTabSelected,
-                containerColor = MaterialTheme.colorScheme.surface
-            ) {
-                Tab(
-                    selected = mainTabSelected == 0,
-                    onClick = { mainTabSelected = 0 },
-                    text = {
-                        Text(
-                            text = "حساب‌ها (${accounts.size})",
-                            fontWeight = if (mainTabSelected == 0) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                )
-                Tab(
-                    selected = mainTabSelected == 1,
-                    onClick = { mainTabSelected = 1 },
-                    text = {
-                        Text(
-                            text = "دسته‌بندی‌ها",
-                            fontWeight = if (mainTabSelected == 1) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                )
-            }
-
-            if (mainTabSelected == 0) {
-                // Accounts Tab
-                if (accounts.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "هیچ حسابی یافت نشد. جهت افزودن، دکمه + را بزنید.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(accounts, key = { it.account.id }) { item ->
-                            val hasPattern = patterns.any { p ->
-                                p.bankName.equals(item.account.name, ignoreCase = true) ||
-                                (p.accountIdentifier.isNotBlank() && (
-                                    item.account.cardNumber?.endsWith(p.accountIdentifier) == true ||
-                                    item.account.shabaNumber?.contains(p.accountIdentifier) == true
-                                ))
-                            }
-
-                            AccountListItem(
-                                accountWithBalance = item,
-                                hasPattern = hasPattern,
-                                onClick = { onNavigateToAccountDetails(item.account.id) },
-                                onEdit = { onNavigateToEditAccount(item.account.id) },
-                                onDelete = { accountToDelete = item.account },
-                                onPatternClick = {
-                                    onNavigateToPatternLearner?.invoke(item.account.id)
-                                }
-                            )
-                        }
-                    }
+            if (accounts.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "هیچ حسابی یافت نشد. جهت افزودن، دکمه + را بزنید.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             } else {
-                // Categories Tab Content
-                com.example.ui.screens.categories.CategoriesScreenContent(
-                    viewModel = categoriesViewModel,
-                    onNavigateToAddCategory = onNavigateToAddCategory,
-                    onNavigateToEditCategory = onNavigateToEditCategory
-                )
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    itemsIndexed(accounts, key = { _, it -> it.account.id }) { index, item ->
+                        val hasPattern = patterns.any { p ->
+                            p.bankName.equals(item.account.name, ignoreCase = true) ||
+                            (p.accountIdentifier.isNotBlank() && (
+                                item.account.cardNumber?.endsWith(p.accountIdentifier) == true ||
+                                item.account.shabaNumber?.contains(p.accountIdentifier) == true
+                            ))
+                        }
+
+                        AccountListItem(
+                            accountWithBalance = item,
+                            hasPattern = hasPattern,
+                            canMoveUp = index > 0,
+                            canMoveDown = index < accounts.size - 1,
+                            onMoveUp = { viewModel.moveAccountUp(item) },
+                            onMoveDown = { viewModel.moveAccountDown(item) },
+                            onClick = { onNavigateToAccountDetails(item.account.id) },
+                            onEdit = { onNavigateToEditAccount(item.account.id) },
+                            onDelete = { accountToDelete = item.account },
+                            onPatternClick = {
+                                onNavigateToPatternLearner?.invoke(item.account.id)
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -227,6 +189,10 @@ fun AccountsScreen(
 fun AccountListItem(
     accountWithBalance: AccountWithBalance,
     hasPattern: Boolean = false,
+    canMoveUp: Boolean = false,
+    canMoveDown: Boolean = false,
+    onMoveUp: () -> Unit = {},
+    onMoveDown: () -> Unit = {},
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -246,7 +212,7 @@ fun AccountListItem(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(80.dp)
+            .height(84.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = { showMenu = true }
@@ -260,20 +226,53 @@ fun AccountListItem(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Sort buttons (Up / Down)
+            Column(
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                IconButton(
+                    onClick = onMoveUp,
+                    enabled = canMoveUp,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowUpward,
+                        contentDescription = "انتقال به بالا",
+                        modifier = Modifier.size(16.dp),
+                        tint = if (canMoveUp) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                    )
+                }
+                IconButton(
+                    onClick = onMoveDown,
+                    enabled = canMoveDown,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDownward,
+                        contentDescription = "انتقال به پایین",
+                        modifier = Modifier.size(16.dp),
+                        tint = if (canMoveDown) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
             BankLogoBadge(
                 bankId = account.logoResName,
                 logoImage = account.logoImage,
                 accountName = account.name,
                 cardNumber = account.cardNumber,
-                size = 56.dp,
+                size = 52.dp,
                 shapeRadius = 14.dp,
                 fallbackColor = cardColor
             )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             Column(
                 modifier = Modifier.weight(1f),

@@ -67,17 +67,12 @@ import com.example.util.DateFormatter
 @Composable
 fun PreConfirmScreen(
     viewModel: PreConfirmViewModel,
-    amount: Long,
-    typeStr: String,
-    date: Long,
-    bankName: String?,
-    accountIdent: String?,
-    smsHash: String,
-    note: String?,
+    sharedScanViewModel: SharedScanViewModel,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val pendingItem by sharedScanViewModel.pendingScanItem.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -86,8 +81,8 @@ fun PreConfirmScreen(
         DateFormatter.extractHourAndMinute(state.dateTimestamp)
     }
 
-    LaunchedEffect(smsHash) {
-        viewModel.initData(amount, typeStr, date, bankName, accountIdent, smsHash, note)
+    LaunchedEffect(pendingItem) {
+        viewModel.initFromItem(pendingItem)
     }
 
     LaunchedEffect(state.errorMessage) {
@@ -99,6 +94,7 @@ fun PreConfirmScreen(
 
     LaunchedEffect(state.isSavedSuccess) {
         if (state.isSavedSuccess) {
+            sharedScanViewModel.clearPendingScanItem()
             onNavigateBack()
         }
     }
@@ -141,7 +137,10 @@ fun PreConfirmScreen(
             TopAppBar(
                 title = { Text("تأیید و ثبت تراکنش", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = {
+                        sharedScanViewModel.clearPendingScanItem()
+                        onNavigateBack()
+                    }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "بازگشت"

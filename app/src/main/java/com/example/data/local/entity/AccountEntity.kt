@@ -21,6 +21,7 @@ data class AccountEntity(
     val cardExpiry: String? = null,
     val logoResName: String? = null,
     val logoImage: String? = null,
+    val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

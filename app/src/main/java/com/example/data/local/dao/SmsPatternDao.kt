@@ -38,4 +38,7 @@ interface SmsPatternDao {
 
     @Query("SELECT * FROM sms_patterns WHERE id = :id")
     fun getById(id: Long): Flow<SmsPatternEntity?>
+
+    @Query("DELETE FROM sms_patterns")
+    suspend fun deleteAll()
 }
