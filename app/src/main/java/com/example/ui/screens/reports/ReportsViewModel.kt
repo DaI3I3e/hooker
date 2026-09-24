@@ -22,6 +22,14 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import java.time.ZoneId
 
+data class MonthlyTrend(
+    val monthName: String,
+    val year: Int,
+    val month: Int,
+    val income: Long,
+    val expense: Long
+)
+
 data class ReportsUiState(
     val selectedPeriod: DateFilterPeriod = DateFilterPeriod.ALL,
     val customStartTimestamp: Long? = null,
@@ -36,6 +44,7 @@ data class ReportsUiState(
     val totalExpense: Long = 0L,
     val netBalance: Long = 0L,
     val categorySummaries: List<CategorySummary> = emptyList(),
+    val monthlyTrends: List<MonthlyTrend> = emptyList(),
     val currentStartTimestamp: Long = 0L,
     val currentEndTimestamp: Long = Long.MAX_VALUE,
     val isLoading: Boolean = false
@@ -178,6 +187,53 @@ class ReportsViewModel(
             )
         }.sortedByDescending { it.totalAmount }
 
+        // Calculate 6-month trends
+        val sixMonthsTrends = mutableListOf<MonthlyTrend>()
+        var curY = todayJalali.year
+        var curM = todayJalali.month
+
+        val monthsToInspect = mutableListOf<Pair<Int, Int>>()
+        for (i in 0 until 6) {
+            monthsToInspect.add(0, Pair(curY, curM))
+            if (curM == 1) {
+                curY -= 1
+                curM = 12
+            } else {
+                curM -= 1
+            }
+        }
+
+        for ((y, m) in monthsToInspect) {
+            val monthStart = JalaliDate(y, m, 1).toStartOfDayTimestamp(zoneId)
+            val monthEnd = JalaliDate(y, m, JalaliDate.getJalaliMonthLength(y, m)).toEndOfDayTimestamp(zoneId)
+
+            var mIncome = 0L
+            var mExpense = 0L
+
+            for (txItem in allTxWithDetails) {
+                val tx = txItem.transaction
+                if (accountId != null && tx.accountId != accountId) continue
+                if (tx.date in monthStart..monthEnd) {
+                    when (tx.type) {
+                        TransactionType.INCOME -> mIncome += tx.amount
+                        TransactionType.EXPENSE -> mExpense += tx.amount
+                        else -> {}
+                    }
+                }
+            }
+
+            val mName = JalaliDate.MONTH_NAMES.getOrNull(m - 1) ?: "$m"
+            sixMonthsTrends.add(
+                MonthlyTrend(
+                    monthName = mName,
+                    year = y,
+                    month = m,
+                    income = mIncome,
+                    expense = mExpense
+                )
+            )
+        }
+
         ReportsUiState(
             selectedPeriod = period,
             customStartTimestamp = customStart,
@@ -192,6 +248,7 @@ class ReportsViewModel(
             totalExpense = expenseSum,
             netBalance = incomeSum - expenseSum,
             categorySummaries = summaries,
+            monthlyTrends = sixMonthsTrends,
             currentStartTimestamp = start,
             currentEndTimestamp = end,
             isLoading = false
