@@ -399,36 +399,54 @@ fun SettingsScreen(
             icon = {
                 Icon(
                     imageVector = Icons.Default.Warning,
-                    contentDescription = "هشدار",
+                    contentDescription = "هشدار بازنویسی داده‌ها",
                     tint = ExpenseColor,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(36.dp)
                 )
             },
             title = {
                 Text(
-                    text = "هشدار بازیابی داده‌ها",
+                    text = "تأیید بازنویسی و بازیابی داده‌ها",
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.fillMaxWidth()
                 )
             },
             text = {
-                Text(
-                    text = "آیا از بازیابی اطلاعات اطمینان دارید؟ تمام داده‌های فعلی برنامه با داده‌های فایل پشتیبان جایگزین خواهند شد.\n\n(یک نسخه پشتیبان خودکار از داده‌های فعلی شما پیش از جایگزینی ذخیره می‌شود.)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Start
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "هشدار مهم:",
+                        fontWeight = FontWeight.Bold,
+                        color = ExpenseColor,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "با بازیابی فایل پشتیبان، تمام داده‌های فعلی شامل تمام تراکنش‌ها، حساب‌ها، بدهی‌ها و دسته‌بندی‌ها حذف شده و با اطلاعات موجود در این فایل جایگزین خواهند شد.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "✓ جهت اطمینان، یک نسخه پشتیبان خودکار از داده‌های فعلی شما پیش از جایگزینی ذخیره می‌شود.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             },
             confirmButton = {
                 Button(
                     onClick = { viewModel.confirmRestore() },
-                    colors = ButtonDefaults.buttonColors(containerColor = ExpenseColor)
+                    colors = ButtonDefaults.buttonColors(containerColor = ExpenseColor),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("بازیابی داده‌ها")
+                    Text("جایگزینی و بازیابی داده‌ها", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissRestoreDialog() }) {
+                OutlinedButton(
+                    onClick = { viewModel.dismissRestoreDialog() },
+                    shape = RoundedCornerShape(10.dp)
+                ) {
                     Text("انصراف")
                 }
             }

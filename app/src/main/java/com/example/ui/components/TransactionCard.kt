@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,6 +29,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.data.local.entity.TransactionType
 import com.example.data.local.relation.TransactionWithDetails
 import com.example.ui.theme.ExpenseColor
@@ -137,12 +139,23 @@ fun TransactionCard(
             }
 
             Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "$amountPrefix ${AmountFormatter.format(tx.amount)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = amountColor
-                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = "$amountPrefix ${AmountFormatter.format(tx.amount, includeCurrency = false)}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = amountColor
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = "ریال",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        color = amountColor.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = DateFormatter.formatShort(tx.date),
                     style = MaterialTheme.typography.labelSmall,

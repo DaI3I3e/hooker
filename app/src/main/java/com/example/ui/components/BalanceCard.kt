@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,7 +52,7 @@ fun BalanceCard(
     totalBalance: Long,
     modifier: Modifier = Modifier
 ) {
-    var isBalanceHidden by rememberSaveable { mutableStateOf(false) }
+    var isBalanceHidden by rememberSaveable { mutableStateOf(true) }
 
     val gradientBrush = Brush.linearGradient(
         colors = listOf(DarkGreenPrimary, DarkGreenGradientEnd)
@@ -131,21 +132,49 @@ fun BalanceCard(
                     label = "balanceAnim"
                 ) { hidden ->
                     if (hidden) {
-                        Text(
-                            text = "••••••••  تومان",
-                            style = MaterialTheme.typography.displayLarge,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                        Row(
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "••••••••",
+                                style = MaterialTheme.typography.displayLarge,
+                                fontSize = 30.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "ریال",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+                        }
                     } else {
-                        Text(
-                            text = AmountFormatter.format(totalBalance),
-                            style = MaterialTheme.typography.displayLarge,
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                        Row(
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = AmountFormatter.format(totalBalance, includeCurrency = false),
+                                style = MaterialTheme.typography.displayLarge,
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "ریال",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+                        }
                     }
                 }
             }
