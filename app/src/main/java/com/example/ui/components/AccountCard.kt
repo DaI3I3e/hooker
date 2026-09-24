@@ -33,10 +33,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.data.local.entity.AccountType
 import com.example.data.local.relation.AccountWithBalance
 import com.example.util.AmountFormatter
 import com.example.util.BankLogoBadge
+import com.example.util.toPersianDigits
 
 @Composable
 fun AccountCard(
@@ -90,13 +92,16 @@ fun AccountCard(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
                 )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "موجودی",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(2.dp))
+                if (!account.cardNumber.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "•••• " + account.cardNumber.takeLast(4).toPersianDigits(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        fontSize = 10.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = AmountFormatter.format(accountWithBalance.currentBalance),
                     style = MaterialTheme.typography.bodyMedium,

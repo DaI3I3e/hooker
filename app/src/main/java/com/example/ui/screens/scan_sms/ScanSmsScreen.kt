@@ -368,29 +368,23 @@ fun ScannedSmsCard(
     val typeText = if (isExpense) "هزینه" else "درآمد"
     val baseTypeColor = if (isExpense) ExpenseColor else IncomeColor
 
-    // Requirement 8: Registered has full gray background, faded text; new has white background
-    val cardBg = if (item.isRegistered) {
-        if (isDark) Color(0xFF2C2C2C) else Color(0xFFE0E0E0)
+    // Clean, readable, eye-friendly card background with subtle outline for registered
+    val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
+    val cardBorder = if (item.isRegistered) {
+        androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     } else {
-        if (isDark) MaterialTheme.colorScheme.surface else Color.White
+        null
     }
 
-    val textColor = if (item.isRegistered) {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
-
-    val typeColor = if (item.isRegistered) {
-        baseTypeColor.copy(alpha = 0.55f)
-    } else {
-        baseTypeColor
-    }
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val subtextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val typeColor = baseTypeColor
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = cardBg),
+        border = cardBorder,
         elevation = CardDefaults.cardElevation(defaultElevation = if (item.isRegistered) 0.dp else 2.dp)
     ) {
         Row(
@@ -414,9 +408,9 @@ fun ScannedSmsCard(
                     Spacer(modifier = Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(typeColor.copy(alpha = if (item.isRegistered) 0.10f else 0.15f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(typeColor.copy(alpha = 0.12f))
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = typeText,
@@ -428,36 +422,36 @@ fun ScannedSmsCard(
                     Spacer(modifier = Modifier.width(6.dp))
 
                     if (item.isRegistered) {
-                        // برچسب «ثبت‌شده» با آیکون تیک
+                        // برچسب «ثبت‌شده» خوانا و باکلاس با آیکون تیک سبز
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color.Gray.copy(alpha = 0.2f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isDark) Color(0xFF1E3320) else Color(0xFFE8F5E9))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.Check,
                                     contentDescription = null,
-                                    tint = Color.Gray,
+                                    tint = if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32),
                                     modifier = Modifier.size(12.dp)
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = "ثبت‌شده",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color.Gray,
+                                    color = if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32),
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
                     } else {
-                        // برچسب «جدید» سبز
+                        // برچسب «جدید» برجسته
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
+                                .clip(RoundedCornerShape(6.dp))
                                 .background(IncomeColor.copy(alpha = 0.15f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = "جدید",
@@ -484,14 +478,14 @@ fun ScannedSmsCard(
                         Text(
                             text = "حساب: $acc",
                             style = MaterialTheme.typography.bodySmall,
-                            color = textColor
+                            color = subtextColor
                         )
                     }
                     parsed.date?.let { ts ->
                         Text(
                             text = DateFormatter.formatLong(ts),
                             style = MaterialTheme.typography.bodySmall,
-                            color = textColor
+                            color = subtextColor
                         )
                     }
                 }
@@ -500,18 +494,18 @@ fun ScannedSmsCard(
             Spacer(modifier = Modifier.width(8.dp))
 
             if (item.isRegistered) {
-                // بدون دکمه + (یا دکمه + غیرفعال)
+                // آیکون تیک شکیل به جای دکمه برای تراکنش‌های ثبت‌شده
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(38.dp)
                         .clip(CircleShape)
-                        .background(Color.Gray.copy(alpha = 0.15f)),
+                        .background(if (isDark) Color(0xFF1E3320) else Color(0xFFE8F5E9)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = "قبلاً ثبت شده",
-                        tint = Color.Gray,
+                        tint = if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -519,6 +513,7 @@ fun ScannedSmsCard(
                 IconButton(
                     onClick = onAddClick,
                     modifier = Modifier
+                        .size(38.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer)
                 ) {
