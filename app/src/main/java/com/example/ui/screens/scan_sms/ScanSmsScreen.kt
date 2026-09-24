@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,8 +27,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Pattern
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -40,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -121,166 +125,231 @@ fun ScanSmsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier
     ) { innerPadding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Permission & Scan Trigger Header Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Sms,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(36.dp)
-                    )
-                    Text(
-                        text = "اسکن و تحلیل پیامک‌های بانکی",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "پیامک‌های دریافتی از بانک‌ها طبق الگوهای تعریف‌شده شناسایی و آماده ثبت می‌شوند.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-
-                    // Range Selector Chips
-                    Row(
+            // Item 1: Scan Card (Compact when completed, full when not yet scanned)
+            item {
+                if (state.isScanCompleted) {
+                    // Compact single-row card after scan
+                    Card(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
-                        val daysOptions = listOf(7, 30, 90)
-                        daysOptions.forEach { days ->
-                            FilterChip(
-                                selected = state.selectedDays == days,
-                                onClick = { viewModel.setSelectedDays(days) },
-                                label = { Text("$days روز گذشته".toPersianDigits()) },
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val daysOptions = listOf(7, 30, 90)
+                                daysOptions.forEach { days ->
+                                    FilterChip(
+                                        selected = state.selectedDays == days,
+                                        onClick = { viewModel.setSelectedDays(days) },
+                                        label = { Text("$days روز".toPersianDigits(), fontSize = 11.sp) },
+                                        modifier = Modifier.height(32.dp)
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (state.hasPermission) {
+                                        viewModel.scanSms(context)
+                                    } else {
+                                        permissionLauncher.launch(Manifest.permission.READ_SMS)
+                                    }
+                                },
+                                enabled = !state.isLoading,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                if (state.isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("در حال اسکن...", fontSize = 11.sp)
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("اسکن مجدد", fontSize = 11.sp)
+                                }
+                            }
                         }
                     }
-
-                    // Scan Action Button
-                    Button(
-                        onClick = {
-                            if (state.hasPermission) {
-                                viewModel.scanSms(context)
-                            } else {
-                                permissionLauncher.launch(Manifest.permission.READ_SMS)
-                            }
-                        },
-                        enabled = !state.isLoading,
-                        modifier = Modifier.fillMaxWidth()
+                } else {
+                    // Full Scan Card before scan
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
-                        if (state.isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Sms,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(36.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("در حال اسکن و پردازش...")
-                        } else {
-                            Text(if (state.hasPermission) "شروع اسکن پیامک‌ها" else "درخواست مجوز و اسکن")
+                            Text(
+                                text = "اسکن و تحلیل پیامک‌های بانکی",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "پیامک‌های دریافتی از بانک‌ها طبق الگوهای تعریف‌شده شناسایی و آماده ثبت می‌شوند.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+
+                            // Range Selector Chips
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val daysOptions = listOf(7, 30, 90)
+                                daysOptions.forEach { days ->
+                                    FilterChip(
+                                        selected = state.selectedDays == days,
+                                        onClick = { viewModel.setSelectedDays(days) },
+                                        label = { Text("$days روز گذشته".toPersianDigits()) },
+                                        modifier = Modifier.padding(horizontal = 4.dp)
+                                    )
+                                }
+                            }
+
+                            // Scan Action Button
+                            Button(
+                                onClick = {
+                                    if (state.hasPermission) {
+                                        viewModel.scanSms(context)
+                                    } else {
+                                        permissionLauncher.launch(Manifest.permission.READ_SMS)
+                                    }
+                                },
+                                enabled = !state.isLoading,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (state.isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("در حال اسکن و پردازش...")
+                                } else {
+                                    Text(if (state.hasPermission) "شروع اسکن پیامک‌ها" else "درخواست مجوز و اسکن")
+                                }
+                            }
                         }
                     }
                 }
             }
 
             if (!state.hasPermission) {
-                Text(
-                    text = "برای اسکن پیامک‌ها نیاز به مجوز خواندن پیامک است.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ExpenseColor,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                item {
+                    Text(
+                        text = "برای اسکن پیامک‌ها نیاز به مجوز خواندن پیامک است.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ExpenseColor,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
             // Results Section
             if (state.isScanCompleted && !state.isLoading) {
                 if (state.scannedList.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 40.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = IncomeColor,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Text(
-                                text = "پیامک بانکی جدیدی پیدا نشد",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "همه تراکنش‌های یافت شده قبلاً ثبت شده‌اند یا پیامک جدیدی وجود ندارد.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = IncomeColor,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Text(
+                                    text = "پیامک بانکی جدیدی پیدا نشد",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "همه تراکنش‌های یافت شده قبلاً ثبت شده‌اند یا پیامک جدیدی وجود ندارد.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "پیامک‌های دریافتی (${state.scannedList.size})".toPersianDigits(),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentPadding = PaddingValues(bottom = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(state.scannedList, key = { it.id }) { item ->
-                            ScannedSmsCard(
-                                item = item,
-                                onAddClick = {
-                                    try {
-                                        sharedScanViewModel.setPendingScanItem(item)
-                                        ScanSmsDataHolder.selectedItem = item
-                                        onNavigateToPreConfirm()
-                                    } catch (e: Throwable) {
-                                        android.util.Log.e("ScanSmsScreen", "Crash opening pre_confirm", e)
-                                        Toast.makeText(context, "خطا در باز کردن صفحه", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "پیامک‌های دریافتی (${state.scannedList.size})".toPersianDigits(),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
                             )
                         }
+                    }
+
+                    items(state.scannedList, key = { it.id }) { item ->
+                        ScannedSmsCard(
+                            item = item,
+                            onAddClick = {
+                                try {
+                                    sharedScanViewModel.setPendingScanItem(item)
+                                    ScanSmsDataHolder.selectedItem = item
+                                    onNavigateToPreConfirm()
+                                } catch (e: Throwable) {
+                                    Log.e("ScanSmsScreen", "Crash opening pre_confirm", e)
+                                    Toast.makeText(context, "خطا در باز کردن صفحه", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -293,16 +362,36 @@ fun ScannedSmsCard(
     item: ScannedSmsItem,
     onAddClick: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
     val parsed = item.parsedSms
     val isExpense = parsed.transactionType != TransactionType.INCOME
     val typeText = if (isExpense) "هزینه" else "درآمد"
-    val typeColor = if (isExpense) ExpenseColor else IncomeColor
+    val baseTypeColor = if (isExpense) ExpenseColor else IncomeColor
+
+    // Requirement 8: Registered has full gray background, faded text; new has white background
+    val cardBg = if (item.isRegistered) {
+        if (isDark) Color(0xFF2C2C2C) else Color(0xFFE0E0E0)
+    } else {
+        if (isDark) MaterialTheme.colorScheme.surface else Color.White
+    }
+
+    val textColor = if (item.isRegistered) {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    val typeColor = if (item.isRegistered) {
+        baseTypeColor.copy(alpha = 0.55f)
+    } else {
+        baseTypeColor
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (item.isRegistered) 0.dp else 2.dp)
     ) {
         Row(
             modifier = Modifier
@@ -319,13 +408,14 @@ fun ScannedSmsCard(
                     Text(
                         text = parsed.bankName ?: "بانک",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = textColor
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(typeColor.copy(alpha = 0.15f))
+                            .background(typeColor.copy(alpha = if (item.isRegistered) 0.10f else 0.15f))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
@@ -336,22 +426,33 @@ fun ScannedSmsCard(
                         )
                     }
                     Spacer(modifier = Modifier.width(6.dp))
-                    // New (green) vs Registered (gray) Badge
+
                     if (item.isRegistered) {
+                        // برچسب «ثبت‌شده» با آیکون تیک
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                                .background(Color.Gray.copy(alpha = 0.2f))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
-                            Text(
-                                text = "ثبت‌شده",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Medium
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "ثبت‌شده",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     } else {
+                        // برچسب «جدید» سبز
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
@@ -383,14 +484,14 @@ fun ScannedSmsCard(
                         Text(
                             text = "حساب: $acc",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = textColor
                         )
                     }
                     parsed.date?.let { ts ->
                         Text(
                             text = DateFormatter.formatLong(ts),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = textColor
                         )
                     }
                 }
@@ -398,17 +499,35 @@ fun ScannedSmsCard(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            IconButton(
-                onClick = onAddClick,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "ثبت تراکنش",
-                    tint = MaterialTheme.colorScheme.primary
-                )
+            if (item.isRegistered) {
+                // بدون دکمه + (یا دکمه + غیرفعال)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.Gray.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "قبلاً ثبت شده",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            } else {
+                IconButton(
+                    onClick = onAddClick,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "ثبت تراکنش",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }

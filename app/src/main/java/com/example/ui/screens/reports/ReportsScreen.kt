@@ -22,6 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,8 +54,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.local.entity.TransactionType
 import com.example.domain.model.CategorySummary
+import com.example.ui.components.FilterBottomSheet
 import com.example.ui.components.getCategoryIcon
+import com.example.ui.screens.transactions.DateFilterPeriod
 import com.example.ui.theme.ExpenseColor
 import com.example.ui.theme.IncomeColor
 import com.example.util.AmountFormatter
@@ -72,7 +78,7 @@ fun ReportsScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var showDateRangePicker by remember { mutableStateOf(false) }
+    var showFilterBottomSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isFullscreen) {
         onToggleFullscreen(state.isFullscreen)
@@ -84,12 +90,25 @@ fun ReportsScreen(
         }
     }
 
-    if (showDateRangePicker) {
-        com.example.ui.components.JalaliDateRangePickerDialog(
-            onDismiss = { showDateRangePicker = false },
-            onRangeSelected = { start, end ->
-                viewModel.setCustomDateRange(start, end)
-                showDateRangePicker = false
+    if (showFilterBottomSheet) {
+        FilterBottomSheet(
+            period = state.selectedPeriod,
+            customStart = state.customStartTimestamp,
+            customEnd = state.customEndTimestamp,
+            accountId = state.selectedAccountId,
+            categoryIds = state.selectedCategoryIds,
+            transactionType = state.selectedType,
+            accounts = state.accounts,
+            categories = state.categories,
+            allowTransfer = false,
+            onDismiss = { showFilterBottomSheet = false },
+            onApply = { period, customStart, customEnd, accountId, categoryIds, type ->
+                viewModel.applyFilters(period, customStart, customEnd, accountId, categoryIds, type)
+                showFilterBottomSheet = false
+            },
+            onReset = {
+                viewModel.resetFilters()
+                showFilterBottomSheet = false
             }
         )
     }
@@ -99,6 +118,24 @@ fun ReportsScreen(
             TopAppBar(
                 title = { Text("گزارش‌های مالی", fontWeight = FontWeight.Bold) },
                 actions = {
+                    BadgedBox(
+                        badge = {
+                            if (state.activeFilterCount > 0) {
+                                Badge {
+                                    Text(state.activeFilterCount.toString().toPersianDigits())
+                                }
+                            }
+                        }
+                    ) {
+                        IconButton(
+                            onClick = { showFilterBottomSheet = true }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = "فیلترها"
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = { viewModel.toggleFullscreen() }
                     ) {
@@ -117,68 +154,6 @@ fun ReportsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (!state.isFullscreen) {
-                // Compact Filter Bar (Period | Account | Category)
-                val periodLabel = when (state.selectedPeriod) {
-                    ReportPeriod.TODAY -> "امروز"
-                    ReportPeriod.WEEK -> "هفته اخیر"
-                    ReportPeriod.MONTH -> "ماه جاری"
-                    ReportPeriod.ALL -> "همه زمان‌ها"
-                    ReportPeriod.CUSTOM -> "دلخواه"
-                }
-                com.example.ui.components.CompactFilterBar(
-                    periodLabel = periodLabel,
-                    isPeriodActive = state.selectedPeriod != ReportPeriod.ALL,
-                    onSelectPeriod = { key ->
-                        val period = when (key) {
-                            "TODAY" -> ReportPeriod.TODAY
-                            "WEEK" -> ReportPeriod.WEEK
-                            "MONTH" -> ReportPeriod.MONTH
-                            "ALL" -> ReportPeriod.ALL
-                            else -> ReportPeriod.ALL
-                        }
-                        viewModel.setPeriod(period)
-                    },
-                    onRequestCustomDate = { showDateRangePicker = true },
-                    accounts = state.accounts,
-                    selectedAccountId = state.selectedAccountId,
-                    onSelectAccount = { viewModel.setAccountFilter(it) },
-                    categories = state.categories,
-                    selectedCategoryId = state.selectedCategoryId,
-                    onSelectCategory = { viewModel.setCategoryFilter(it) }
-                )
-
-                // Income vs Expense Report Toggle
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = state.selectedReportType == com.example.data.local.entity.TransactionType.EXPENSE,
-                        onClick = { viewModel.setReportType(com.example.data.local.entity.TransactionType.EXPENSE) },
-                        label = { Text("گزارش هزینه‌ها") },
-                        colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = ExpenseColor.copy(alpha = 0.2f),
-                            selectedLabelColor = ExpenseColor
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    FilterChip(
-                        selected = state.selectedReportType == com.example.data.local.entity.TransactionType.INCOME,
-                        onClick = { viewModel.setReportType(com.example.data.local.entity.TransactionType.INCOME) },
-                        label = { Text("گزارش درآمدها") },
-                        colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = IncomeColor.copy(alpha = 0.2f),
-                            selectedLabelColor = IncomeColor
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
@@ -195,7 +170,7 @@ fun ReportsScreen(
 
                 // Donut Chart Card
                 item {
-                    val isExpense = state.selectedReportType == com.example.data.local.entity.TransactionType.EXPENSE
+                    val isExpense = state.selectedType != TransactionType.INCOME
                     val totalForType = if (isExpense) state.totalExpense else state.totalIncome
                     val chartTitle = if (isExpense) "نمودار هزینه‌ها به تفکیک دسته" else "نمودار درآمدها به تفکیک دسته"
                     val emptyText = if (isExpense) "هیچ تراکنش هزینه‌ای در این بازه ثبت نشده است." else "هیچ تراکنش درآمدی در این بازه ثبت نشده است."
@@ -292,7 +267,7 @@ fun ReportsScreen(
                                     state.currentStartTimestamp,
                                     state.currentEndTimestamp,
                                     state.selectedAccountId,
-                                    state.selectedReportType.name
+                                    summary.category.type.name
                                 )
                             }
                         )

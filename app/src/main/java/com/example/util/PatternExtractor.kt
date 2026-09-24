@@ -175,8 +175,6 @@ object PatternExtractor {
     fun cleanSharedText(text: String): String {
         return text
             .replace("%20", " ")
-            .replace(Regex("""(?<![\d۰-۹٠-٩])\+(?![\d۰-۹٠-٩])"""), " ")
-            .replace(Regex("""\s+"""), " ")
             .trim()
     }
 }

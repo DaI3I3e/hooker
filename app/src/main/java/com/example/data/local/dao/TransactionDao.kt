@@ -174,4 +174,40 @@ interface TransactionDao {
 
     @Query("SELECT smsHash FROM transactions WHERE smsHash IS NOT NULL")
     suspend fun getAllSmsHashesList(): List<String>
+
+    @Query("""
+        SELECT 
+          t.*,
+          a1.name AS accountName,
+          a2.name AS toAccountName,
+          c.name AS categoryName,
+          c.color AS categoryColor,
+          c.icon AS categoryIcon,
+          a1.logoResName AS accountLogo,
+          a1.cardNumber AS accountCardNumber
+        FROM transactions t
+        LEFT JOIN accounts a1 ON t.accountId = a1.id
+        LEFT JOIN accounts a2 ON t.toAccountId = a2.id
+        LEFT JOIN categories c ON t.categoryId = c.id
+        ORDER BY t.date DESC, t.id DESC
+    """)
+    suspend fun getAllWithDetailsList(): List<TransactionWithDetails>
+
+    @Query("""
+        SELECT 
+          t.*,
+          a1.name AS accountName,
+          a2.name AS toAccountName,
+          c.name AS categoryName,
+          c.color AS categoryColor,
+          c.icon AS categoryIcon,
+          a1.logoResName AS accountLogo,
+          a1.cardNumber AS accountCardNumber
+        FROM transactions t
+        LEFT JOIN accounts a1 ON t.accountId = a1.id
+        LEFT JOIN accounts a2 ON t.toAccountId = a2.id
+        LEFT JOIN categories c ON t.categoryId = c.id
+        WHERE t.amount = :amount AND t.date >= :dayStart AND t.date <= :dayEnd
+    """)
+    suspend fun findMatchingTransactions(amount: Long, dayStart: Long, dayEnd: Long): List<TransactionWithDetails>
 }

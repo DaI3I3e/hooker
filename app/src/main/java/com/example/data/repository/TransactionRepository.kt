@@ -84,4 +84,12 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
     suspend fun getAllSmsHashesList(): List<String> = withContext(Dispatchers.IO) {
         transactionDao.getAllSmsHashesList()
     }
+
+    suspend fun getAllTransactionsWithDetailsList(): List<TransactionWithDetails> = withContext(Dispatchers.IO) {
+        transactionDao.getAllWithDetailsList()
+    }
+
+    suspend fun findMatchingTransactions(amount: Long, dayStart: Long, dayEnd: Long): List<TransactionWithDetails> = withContext(Dispatchers.IO) {
+        transactionDao.findMatchingTransactions(amount, dayStart, dayEnd)
+    }
 }

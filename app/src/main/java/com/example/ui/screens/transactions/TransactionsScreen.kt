@@ -28,7 +28,10 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -75,6 +78,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.entity.TransactionEntity
 import com.example.data.local.entity.TransactionType
 import com.example.data.local.relation.TransactionWithDetails
+import com.example.ui.components.FilterBottomSheet
 import com.example.ui.components.TransactionCard
 import com.example.ui.components.getCategoryIcon
 import com.example.ui.theme.ExpenseColor
@@ -82,6 +86,7 @@ import com.example.ui.theme.IncomeColor
 import com.example.ui.theme.TransferColor
 import com.example.util.AmountFormatter
 import com.example.util.DateFormatter
+import com.example.util.toPersianDigits
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,7 +102,7 @@ fun TransactionsScreen(
     val scope = rememberCoroutineScope()
 
     var transactionToDelete by remember { mutableStateOf<TransactionEntity?>(null) }
-    var showDateRangePicker by remember { mutableStateOf(false) }
+    var showFilterBottomSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isFullscreen) {
         onToggleFullscreen(state.isFullscreen)
@@ -109,12 +114,25 @@ fun TransactionsScreen(
         }
     }
 
-    if (showDateRangePicker) {
-        com.example.ui.components.JalaliDateRangePickerDialog(
-            onDismiss = { showDateRangePicker = false },
-            onRangeSelected = { start, end ->
-                viewModel.setCustomDateRange(start, end)
-                showDateRangePicker = false
+    if (showFilterBottomSheet) {
+        FilterBottomSheet(
+            period = state.selectedPeriod,
+            customStart = state.customStartTimestamp,
+            customEnd = state.customEndTimestamp,
+            accountId = state.selectedAccountId,
+            categoryIds = state.selectedCategoryIds,
+            transactionType = state.selectedType,
+            accounts = state.accounts,
+            categories = state.categories,
+            allowTransfer = true,
+            onDismiss = { showFilterBottomSheet = false },
+            onApply = { period, customStart, customEnd, accountId, categoryIds, type ->
+                viewModel.applyFilters(period, customStart, customEnd, accountId, categoryIds, type)
+                showFilterBottomSheet = false
+            },
+            onReset = {
+                viewModel.resetFilters()
+                showFilterBottomSheet = false
             }
         )
     }
@@ -185,6 +203,24 @@ fun TransactionsScreen(
                                 contentDescription = "جستجو"
                             )
                         }
+                        BadgedBox(
+                            badge = {
+                                if (state.activeFilterCount > 0) {
+                                    Badge {
+                                        Text(state.activeFilterCount.toString().toPersianDigits())
+                                    }
+                                }
+                            }
+                        ) {
+                            IconButton(
+                                onClick = { showFilterBottomSheet = true }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = "فیلترها"
+                                )
+                            }
+                        }
                         IconButton(
                             onClick = { viewModel.toggleFullscreen() }
                         ) {
@@ -208,66 +244,6 @@ fun TransactionsScreen(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                if (!state.isFullscreen) {
-                    // Compact Filter Bar (Period | Account | Category)
-                    com.example.ui.components.CompactFilterBar(
-                        periodLabel = state.selectedPeriod.label,
-                        isPeriodActive = state.selectedPeriod != DateFilterPeriod.ALL,
-                        onSelectPeriod = { key ->
-                            val period = DateFilterPeriod.valueOf(key)
-                            viewModel.setPeriod(period)
-                        },
-                        onRequestCustomDate = { showDateRangePicker = true },
-                        accounts = state.accounts,
-                        selectedAccountId = state.selectedAccountId,
-                        onSelectAccount = { viewModel.setAccountFilter(it) },
-                        categories = state.categories,
-                        selectedCategoryId = state.selectedCategoryId,
-                        onSelectCategory = { viewModel.setCategoryFilter(it) }
-                    )
-
-                    // Type Filter Chips (All / Expense / Income / Transfer)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilterChip(
-                            selected = state.selectedType == null,
-                            onClick = { viewModel.setType(null) },
-                            label = { Text("همه") }
-                        )
-                        FilterChip(
-                            selected = state.selectedType == TransactionType.EXPENSE,
-                            onClick = { viewModel.setType(TransactionType.EXPENSE) },
-                            label = { Text("هزینه") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = ExpenseColor.copy(alpha = 0.2f),
-                                selectedLabelColor = ExpenseColor
-                            )
-                        )
-                        FilterChip(
-                            selected = state.selectedType == TransactionType.INCOME,
-                            onClick = { viewModel.setType(TransactionType.INCOME) },
-                            label = { Text("درآمد") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = IncomeColor.copy(alpha = 0.2f),
-                                selectedLabelColor = IncomeColor
-                            )
-                        )
-                        FilterChip(
-                            selected = state.selectedType == TransactionType.TRANSFER,
-                            onClick = { viewModel.setType(TransactionType.TRANSFER) },
-                            label = { Text("انتقال") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = TransferColor.copy(alpha = 0.2f),
-                                selectedLabelColor = TransferColor
-                            )
-                        )
-                    }
-                }
-
                 // Grouped Transaction List
                 if (state.groupedTransactions.isEmpty()) {
                     Box(

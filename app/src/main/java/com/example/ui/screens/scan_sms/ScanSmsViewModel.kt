@@ -5,8 +5,10 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.data.repository.AccountRepository
 import com.example.data.repository.SmsPatternRepository
 import com.example.data.repository.TransactionRepository
+import com.example.util.JalaliDate
 import com.example.util.ParsedSms
 import com.example.util.SmsParser
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +40,7 @@ data class ScanSmsUiState(
 
 class ScanSmsViewModel(
     private val transactionRepository: TransactionRepository,
+    private val accountRepository: AccountRepository,
     private val smsPatternRepository: SmsPatternRepository
 ) : ViewModel() {
 
@@ -63,7 +66,10 @@ class ScanSmsViewModel(
         viewModelScope.launch {
             try {
                 val items = withContext(Dispatchers.IO) {
-                    val existingHashes = transactionRepository.getAllSmsHashesList().toSet()
+                    val existingTransactions = transactionRepository.getAllTransactionsWithDetailsList()
+                    val allAccounts = accountRepository.getAllAccountsList()
+                    val accountMap = allAccounts.associateBy { it.id }
+
                     val patterns = try {
                         smsPatternRepository.getActivePatternsList()
                     } catch (e: Exception) {
@@ -100,16 +106,58 @@ class ScanSmsViewModel(
 
                             // Strict check: only include SMS where amount, date, and transactionType are all non-null and amount > 0
                             val amt = parsed.amount
-                            val smsDate = parsed.date
+                            val smsDate = parsed.date ?: date
                             val txType = parsed.transactionType
-                            val isStrictlyMatched = (amt != null && amt > 0L && smsDate != null && txType != null)
+                            val isStrictlyMatched = (amt != null && amt > 0L && txType != null)
 
                             if (isStrictlyMatched) {
-                                val accountIdent = parsed.accountIdentifier ?: parsed.bankName ?: ""
+                                val accountIdent = parsed.accountIdentifier?.trim() ?: ""
+                                val bankName = parsed.bankName?.trim() ?: ""
 
-                                // Calculate hash and check if registered
+                                // Calculate hash
                                 val hash = "${amt}_${smsDate}_${accountIdent}"
-                                val isRegistered = existingHashes.contains(hash)
+
+                                val smsJalali = JalaliDate.fromTimestamp(smsDate)
+
+                                // Accurate check for registered transaction based on:
+                                // 1. Amount: exactly equal (Long)
+                                // 2. Date: same day (year + month + day Jalali), ignoring hour/minute
+                                // 3. Account: accountIdentifier matches registered account's card/account number
+                                val isRegistered = existingTransactions.any { txItem ->
+                                    val tx = txItem.transaction
+
+                                    // Exact smsHash match
+                                    if (!tx.smsHash.isNullOrBlank() && tx.smsHash == hash) {
+                                        return@any true
+                                    }
+
+                                    // 1. Amount match
+                                    if (tx.amount != amt) return@any false
+
+                                    // 2. Same day in Jalali calendar
+                                    val txJalali = JalaliDate.fromTimestamp(tx.date)
+                                    val sameDay = txJalali.year == smsJalali.year &&
+                                            txJalali.month == smsJalali.month &&
+                                            txJalali.day == smsJalali.day
+                                    if (!sameDay) return@any false
+
+                                    // 3. Account matching
+                                    if (accountIdent.isNotBlank()) {
+                                        val account = tx.accountId?.let { accountMap[it] }
+                                        val card = account?.cardNumber ?: txItem.accountCardNumber
+                                        val shaba = account?.shabaNumber
+                                        val name = account?.name ?: txItem.accountName
+
+                                        val matchesCard = card != null && (card.contains(accountIdent) || accountIdent.contains(card.takeLast(4)))
+                                        val matchesShaba = shaba != null && shaba.contains(accountIdent)
+                                        val matchesName = name != null && (name.contains(accountIdent) || accountIdent.contains(name))
+                                        val matchesBank = bankName.isNotBlank() && name != null && (name.contains(bankName) || bankName.contains(name))
+
+                                        matchesCard || matchesShaba || matchesName || matchesBank
+                                    } else {
+                                        true
+                                    }
+                                }
 
                                 // Avoid duplicate within current scan list
                                 if (scannedResult.any { it.smsHash == hash }) continue
@@ -171,11 +219,12 @@ class ScanSmsViewModel(
 
     class Factory(
         private val transactionRepository: TransactionRepository,
+        private val accountRepository: AccountRepository,
         private val smsPatternRepository: SmsPatternRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return ScanSmsViewModel(transactionRepository, smsPatternRepository) as T
+            return ScanSmsViewModel(transactionRepository, accountRepository, smsPatternRepository) as T
         }
     }
 }

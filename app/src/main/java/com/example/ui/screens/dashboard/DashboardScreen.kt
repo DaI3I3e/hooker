@@ -111,6 +111,57 @@ fun DashboardScreen(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
+
+                // Row 1: انتقال، حساب‌ها، دسته‌بندی‌ها، بدهی و طلب
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    QuickAccessItem(
+                        title = "انتقال",
+                        icon = Icons.Default.SwapHoriz,
+                        color = Color(0xFF1E88E5),
+                        onClick = {
+                            showMoreBottomSheet = false
+                            onNavigateToTransfer()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    QuickAccessItem(
+                        title = "حساب‌ها",
+                        icon = Icons.Default.AccountBalanceWallet,
+                        color = Color(0xFF1976D2),
+                        onClick = {
+                            showMoreBottomSheet = false
+                            onNavigateToAccounts()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    QuickAccessItem(
+                        title = "دسته‌بندی‌ها",
+                        icon = Icons.Default.Category,
+                        color = Color(0xFF8E24AA),
+                        onClick = {
+                            showMoreBottomSheet = false
+                            onNavigateToCategories()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    QuickAccessItem(
+                        title = "بدهی و طلب",
+                        icon = Icons.Default.ReceiptLong,
+                        color = Color(0xFFFB8C00),
+                        onClick = {
+                            showMoreBottomSheet = false
+                            onNavigateToDebts()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Row 2: گزارش‌ها، وارد کردن پیامک، تنظیمات
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceAround
@@ -126,7 +177,7 @@ fun DashboardScreen(
                         modifier = Modifier.weight(1f)
                     )
                     QuickAccessItem(
-                        title = "ورود پیامک",
+                        title = "وارد کردن پیامک",
                         icon = Icons.Default.MailOutline,
                         color = Color(0xFFE91E63),
                         onClick = {
@@ -208,7 +259,7 @@ fun DashboardScreen(
             }
         }
 
-        // Quick Access (دسترسی سریع) 4-column Grid (2 rows)
+        // Quick Access (دسترسی سریع) 4 Icons
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -221,7 +272,7 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp)
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
                     Text(
                         text = "دسترسی سریع",
@@ -231,7 +282,7 @@ fun DashboardScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Row 1: ثبت هزینه (قرمز)، ثبت درآمد (سبز)، انتقال (آبی)، اسکن پیامک (فیروزه‌ای)
+                    // 4 Icons: ثبت هزینه (قرمز)، ثبت درآمد (سبز)، اسکن پیامک‌ها (فیروزه‌ای)، سایر (خاکستری)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceAround
@@ -251,51 +302,14 @@ fun DashboardScreen(
                             modifier = Modifier.weight(1f)
                         )
                         QuickAccessItem(
-                            title = "انتقال",
-                            icon = Icons.Default.SwapHoriz,
-                            color = Color(0xFF1E88E5),
-                            onClick = onNavigateToTransfer,
-                            modifier = Modifier.weight(1f)
-                        )
-                        QuickAccessItem(
-                            title = "اسکن پیامک",
+                            title = "اسکن پیامک‌ها",
                             icon = Icons.Default.Sms,
                             color = Color(0xFF00ACC1),
                             onClick = onNavigateToScanSms,
                             modifier = Modifier.weight(1f)
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Row 2: حساب‌ها (آبی)، دسته‌بندی‌ها (بنفش)، بدهی و طلب (نارنجی)، سایر... (خاکستری)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
                         QuickAccessItem(
-                            title = "حساب‌ها",
-                            icon = Icons.Default.AccountBalanceWallet,
-                            color = Color(0xFF1976D2),
-                            onClick = onNavigateToAccounts,
-                            modifier = Modifier.weight(1f)
-                        )
-                        QuickAccessItem(
-                            title = "دسته‌بندی‌ها",
-                            icon = Icons.Default.Category,
-                            color = Color(0xFF8E24AA),
-                            onClick = onNavigateToCategories,
-                            modifier = Modifier.weight(1f)
-                        )
-                        QuickAccessItem(
-                            title = "بدهی و طلب",
-                            icon = Icons.Default.ReceiptLong,
-                            color = Color(0xFFFB8C00),
-                            onClick = onNavigateToDebts,
-                            modifier = Modifier.weight(1f)
-                        )
-                        QuickAccessItem(
-                            title = "سایر...",
+                            title = "سایر",
                             icon = Icons.Default.MoreHoriz,
                             color = Color(0xFF757575),
                             onClick = { showMoreBottomSheet = true },
@@ -393,7 +407,7 @@ fun QuickAccessItem(
     ) {
         Box(
             modifier = Modifier
-                .size(42.dp)
+                .size(44.dp)
                 .clip(CircleShape)
                 .background(color.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center

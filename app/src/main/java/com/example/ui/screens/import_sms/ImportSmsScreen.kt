@@ -86,8 +86,19 @@ fun ImportSmsScreen(
     val scrollState = rememberScrollState()
 
     LaunchedEffect(initialText) {
-        if (!initialText.isNullOrBlank() && initialText != "{initialText}") {
-            viewModel.setInitialSmsText(initialText)
+        val raw = if (!initialText.isNullOrBlank() && initialText != "{initialText}") {
+            try {
+                java.net.URLDecoder.decode(initialText, "UTF-8")
+            } catch (e: Exception) {
+                initialText
+            }
+        } else {
+            SharedSmsHolder.sharedText
+        }
+
+        if (!raw.isNullOrBlank()) {
+            viewModel.setInitialSmsText(raw)
+            SharedSmsHolder.sharedText = null
         }
     }
 

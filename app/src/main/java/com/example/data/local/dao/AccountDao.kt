@@ -27,6 +27,9 @@ interface AccountDao {
     @Query("SELECT * FROM accounts ORDER BY sortOrder ASC, id ASC")
     fun getAll(): Flow<List<AccountEntity>>
 
+    @Query("SELECT * FROM accounts ORDER BY sortOrder ASC, id ASC")
+    suspend fun getAllAccountsList(): List<AccountEntity>
+
     @Query("SELECT * FROM accounts WHERE id = :id")
     fun getById(id: Long): Flow<AccountEntity?>
 

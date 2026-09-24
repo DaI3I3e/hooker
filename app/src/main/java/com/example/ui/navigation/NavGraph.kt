@@ -504,6 +504,7 @@ fun NavGraph(
                 val viewModel: ScanSmsViewModel = viewModel(
                     factory = ScanSmsViewModel.Factory(
                         transactionRepository = app.appModule.transactionRepository,
+                        accountRepository = app.appModule.accountRepository,
                         smsPatternRepository = app.appModule.smsPatternRepository
                     )
                 )

@@ -12,6 +12,7 @@ import com.example.data.repository.AccountRepository
 import com.example.data.repository.CategoryRepository
 import com.example.data.repository.TransactionRepository
 import com.example.domain.model.CategorySummary
+import com.example.ui.screens.transactions.DateFilterPeriod
 import com.example.util.JalaliDate
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,19 +22,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import java.time.ZoneId
 
-enum class ReportPeriod {
-    TODAY,
-    WEEK,
-    MONTH,
-    ALL,
-    CUSTOM
-}
-
 data class ReportsUiState(
-    val selectedPeriod: ReportPeriod = ReportPeriod.MONTH,
+    val selectedPeriod: DateFilterPeriod = DateFilterPeriod.ALL,
+    val customStartTimestamp: Long? = null,
+    val customEndTimestamp: Long? = null,
     val selectedAccountId: Long? = null,
-    val selectedCategoryId: Long? = null,
-    val selectedReportType: TransactionType = TransactionType.EXPENSE,
+    val selectedCategoryIds: Set<Long> = emptySet(),
+    val selectedType: TransactionType? = null,
     val isFullscreen: Boolean = false,
     val accounts: List<AccountEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
@@ -44,7 +39,17 @@ data class ReportsUiState(
     val currentStartTimestamp: Long = 0L,
     val currentEndTimestamp: Long = Long.MAX_VALUE,
     val isLoading: Boolean = false
-)
+) {
+    val activeFilterCount: Int
+        get() {
+            var count = 0
+            if (selectedPeriod != DateFilterPeriod.ALL) count++
+            if (selectedAccountId != null) count++
+            if (selectedCategoryIds.isNotEmpty()) count++
+            if (selectedType != null) count++
+            return count
+        }
+}
 
 class ReportsViewModel(
     private val transactionRepository: TransactionRepository,
@@ -52,10 +57,10 @@ class ReportsViewModel(
     private val categoryRepository: CategoryRepository
 ) : ViewModel() {
 
-    private val _selectedPeriod = MutableStateFlow(ReportPeriod.MONTH)
+    private val _selectedPeriod = MutableStateFlow(DateFilterPeriod.ALL)
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
-    private val _selectedCategoryId = MutableStateFlow<Long?>(null)
-    private val _selectedReportType = MutableStateFlow(TransactionType.EXPENSE)
+    private val _selectedCategoryIds = MutableStateFlow<Set<Long>>(emptySet())
+    private val _selectedType = MutableStateFlow<TransactionType?>(null)
     private val _customStartTimestamp = MutableStateFlow<Long?>(null)
     private val _customEndTimestamp = MutableStateFlow<Long?>(null)
     private val _isFullscreen = MutableStateFlow(false)
@@ -64,8 +69,8 @@ class ReportsViewModel(
     val uiState: StateFlow<ReportsUiState> = combine(
         _selectedPeriod,
         _selectedAccountId,
-        _selectedCategoryId,
-        _selectedReportType,
+        _selectedCategoryIds,
+        _selectedType,
         _customStartTimestamp,
         _customEndTimestamp,
         _isFullscreen,
@@ -73,10 +78,12 @@ class ReportsViewModel(
         categoryRepository.allCategories,
         transactionRepository.allTransactionsWithDetails
     ) { flows: Array<Any?> ->
-        val period = flows[0] as ReportPeriod
+        val period = flows[0] as DateFilterPeriod
         val accountId = flows[1] as Long?
-        val categoryId = flows[2] as Long?
-        val reportType = flows[3] as TransactionType
+        @Suppress("UNCHECKED_CAST")
+        val categoryIds = flows[2] as Set<Long>
+        @Suppress("UNCHECKED_CAST")
+        val filterType = flows[3] as TransactionType?
         val customStart = flows[4] as Long?
         val customEnd = flows[5] as Long?
         val isFullscreen = flows[6] as Boolean
@@ -90,23 +97,23 @@ class ReportsViewModel(
         val zoneId = ZoneId.systemDefault()
         val todayJalali = JalaliDate.today(zoneId)
         val (start, end) = when (period) {
-            ReportPeriod.TODAY -> Pair(
+            DateFilterPeriod.TODAY -> Pair(
                 todayJalali.toStartOfDayTimestamp(zoneId),
                 todayJalali.toEndOfDayTimestamp(zoneId)
             )
-            ReportPeriod.WEEK -> Pair(
+            DateFilterPeriod.WEEK -> Pair(
                 todayJalali.toStartOfDayTimestamp(zoneId) - (6 * 24 * 60 * 60 * 1000L),
                 todayJalali.toEndOfDayTimestamp(zoneId)
             )
-            ReportPeriod.MONTH -> Pair(
+            DateFilterPeriod.MONTH -> Pair(
                 JalaliDate.getStartOfCurrentMonth(zoneId),
                 JalaliDate.getEndOfCurrentMonth(zoneId)
             )
-            ReportPeriod.ALL -> Pair(
+            DateFilterPeriod.ALL -> Pair(
                 0L,
                 Long.MAX_VALUE
             )
-            ReportPeriod.CUSTOM -> Pair(
+            DateFilterPeriod.CUSTOM -> Pair(
                 customStart ?: 0L,
                 customEnd ?: Long.MAX_VALUE
             )
@@ -116,8 +123,9 @@ class ReportsViewModel(
             val d = item.transaction.date
             val inDateRange = d in start..end
             val inAccount = (accountId == null || item.transaction.accountId == accountId || item.transaction.toAccountId == accountId)
-            val inCategory = (categoryId == null || item.transaction.categoryId == categoryId)
-            inDateRange && inAccount && inCategory
+            val inCategory = (categoryIds.isEmpty() || (item.transaction.categoryId != null && categoryIds.contains(item.transaction.categoryId)))
+            val inType = (filterType == null || item.transaction.type == filterType)
+            inDateRange && inAccount && inCategory && inType
         }
 
         var incomeSum = 0L
@@ -128,6 +136,10 @@ class ReportsViewModel(
         val categoryNameMap = mutableMapOf<Long, String>()
         val categoryCountMap = mutableMapOf<Long, Int>()
 
+        // Decide which transaction type to break down in the chart:
+        // If filterType is INCOME, break down income; otherwise break down expense
+        val chartType = if (filterType == TransactionType.INCOME) TransactionType.INCOME else TransactionType.EXPENSE
+
         inRange.forEach { item ->
             val tx = item.transaction
             if (tx.type == TransactionType.INCOME) {
@@ -136,7 +148,7 @@ class ReportsViewModel(
                 expenseSum += tx.amount
             }
 
-            if (tx.type == reportType) {
+            if (tx.type == chartType) {
                 val catId = tx.categoryId ?: 0L
                 categoryAmountMap[catId] = (categoryAmountMap[catId] ?: 0L) + tx.amount
                 categoryCountMap[catId] = (categoryCountMap[catId] ?: 0) + 1
@@ -148,7 +160,7 @@ class ReportsViewModel(
             }
         }
 
-        val totalForType = if (reportType == TransactionType.EXPENSE) expenseSum else incomeSum
+        val totalForType = if (chartType == TransactionType.EXPENSE) expenseSum else incomeSum
 
         val summaries = categoryAmountMap.map { (catId, totalAmt) ->
             val percentage = if (totalForType > 0) (totalAmt.toDouble() / totalForType * 100).toFloat() else 0f
@@ -156,7 +168,7 @@ class ReportsViewModel(
                 category = CategoryEntity(
                     id = catId,
                     name = categoryNameMap[catId] ?: "سایر",
-                    type = if (reportType == TransactionType.EXPENSE) CategoryType.EXPENSE else CategoryType.INCOME,
+                    type = if (chartType == TransactionType.EXPENSE) CategoryType.EXPENSE else CategoryType.INCOME,
                     color = categoryColorMap[catId] ?: 0xFF757575.toInt(),
                     icon = categoryIconMap[catId] ?: "more_horiz"
                 ),
@@ -168,9 +180,11 @@ class ReportsViewModel(
 
         ReportsUiState(
             selectedPeriod = period,
+            customStartTimestamp = customStart,
+            customEndTimestamp = customEnd,
             selectedAccountId = accountId,
-            selectedCategoryId = categoryId,
-            selectedReportType = reportType,
+            selectedCategoryIds = categoryIds,
+            selectedType = filterType,
             isFullscreen = isFullscreen,
             accounts = accountsList,
             categories = categoriesList,
@@ -188,26 +202,51 @@ class ReportsViewModel(
         initialValue = ReportsUiState(isLoading = true)
     )
 
-    fun setPeriod(period: ReportPeriod) {
+    fun applyFilters(
+        period: DateFilterPeriod,
+        customStart: Long?,
+        customEnd: Long?,
+        accountId: Long?,
+        categoryIds: Set<Long>,
+        type: TransactionType?
+    ) {
+        _selectedPeriod.value = period
+        _customStartTimestamp.value = customStart
+        _customEndTimestamp.value = customEnd
+        _selectedAccountId.value = accountId
+        _selectedCategoryIds.value = categoryIds
+        _selectedType.value = type
+    }
+
+    fun resetFilters() {
+        _selectedPeriod.value = DateFilterPeriod.ALL
+        _customStartTimestamp.value = null
+        _customEndTimestamp.value = null
+        _selectedAccountId.value = null
+        _selectedCategoryIds.value = emptySet()
+        _selectedType.value = null
+    }
+
+    fun setPeriod(period: DateFilterPeriod) {
         _selectedPeriod.value = period
     }
 
     fun setCustomDateRange(start: Long, end: Long) {
         _customStartTimestamp.value = start
         _customEndTimestamp.value = end
-        _selectedPeriod.value = ReportPeriod.CUSTOM
+        _selectedPeriod.value = DateFilterPeriod.CUSTOM
     }
 
     fun setAccountFilter(accountId: Long?) {
         _selectedAccountId.value = accountId
     }
 
-    fun setCategoryFilter(categoryId: Long?) {
-        _selectedCategoryId.value = categoryId
+    fun setCategoryFilter(categoryIds: Set<Long>) {
+        _selectedCategoryIds.value = categoryIds
     }
 
-    fun setReportType(type: TransactionType) {
-        _selectedReportType.value = type
+    fun setReportType(type: TransactionType?) {
+        _selectedType.value = type
     }
 
     fun toggleFullscreen() {

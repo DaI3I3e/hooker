@@ -30,9 +30,11 @@ enum class DateFilterPeriod(val label: String) {
 
 data class TransactionsUiState(
     val selectedPeriod: DateFilterPeriod = DateFilterPeriod.ALL,
+    val customStartTimestamp: Long? = null,
+    val customEndTimestamp: Long? = null,
     val selectedType: TransactionType? = null, // null means ALL
     val selectedAccountId: Long? = null, // null means ALL ACCOUNTS
-    val selectedCategoryId: Long? = null, // null means ALL CATEGORIES
+    val selectedCategoryIds: Set<Long> = emptySet(), // empty means ALL CATEGORIES
     val searchQuery: String = "",
     val isSearchActive: Boolean = false,
     val isFullscreen: Boolean = false,
@@ -43,7 +45,17 @@ data class TransactionsUiState(
     val totalIncome: Long = 0L,
     val totalExpense: Long = 0L,
     val isLoading: Boolean = false
-)
+) {
+    val activeFilterCount: Int
+        get() {
+            var count = 0
+            if (selectedPeriod != DateFilterPeriod.ALL) count++
+            if (selectedAccountId != null) count++
+            if (selectedCategoryIds.isNotEmpty()) count++
+            if (selectedType != null) count++
+            return count
+        }
+}
 
 class TransactionsViewModel(
     private val transactionRepository: TransactionRepository,
@@ -54,7 +66,7 @@ class TransactionsViewModel(
     private val _selectedPeriod = MutableStateFlow(DateFilterPeriod.ALL)
     private val _selectedType = MutableStateFlow<TransactionType?>(null)
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
-    private val _selectedCategoryId = MutableStateFlow<Long?>(null)
+    private val _selectedCategoryIds = MutableStateFlow<Set<Long>>(emptySet())
     private val _searchQuery = MutableStateFlow("")
     private val _isSearchActive = MutableStateFlow(false)
     private val _customStartTimestamp = MutableStateFlow<Long?>(null)
@@ -71,7 +83,7 @@ class TransactionsViewModel(
         _selectedPeriod,
         _selectedType,
         _selectedAccountId,
-        _selectedCategoryId,
+        _selectedCategoryIds,
         _searchQuery,
         _isSearchActive,
         _customStartTimestamp,
@@ -89,7 +101,8 @@ class TransactionsViewModel(
         @Suppress("UNCHECKED_CAST")
         val type = flows[4] as TransactionType?
         val accountId = flows[5] as Long?
-        val categoryId = flows[6] as Long?
+        @Suppress("UNCHECKED_CAST")
+        val categoryIds = flows[6] as Set<Long>
         val query = flows[7] as String
         val isSearch = flows[8] as Boolean
         val customStart = flows[9] as Long?
@@ -131,8 +144,8 @@ class TransactionsViewModel(
             // Account filter
             val matchesAccount = accountId == null || tx.transaction.accountId == accountId || tx.transaction.toAccountId == accountId
 
-            // Category filter
-            val matchesCategory = categoryId == null || tx.transaction.categoryId == categoryId
+            // Category filter (multi-select)
+            val matchesCategory = categoryIds.isEmpty() || (tx.transaction.categoryId != null && categoryIds.contains(tx.transaction.categoryId))
 
             // Search query filter
             val matchesQuery = query.isBlank() ||
@@ -167,9 +180,11 @@ class TransactionsViewModel(
 
         TransactionsUiState(
             selectedPeriod = period,
+            customStartTimestamp = customStart,
+            customEndTimestamp = customEnd,
             selectedType = type,
             selectedAccountId = accountId,
-            selectedCategoryId = categoryId,
+            selectedCategoryIds = categoryIds,
             searchQuery = query,
             isSearchActive = isSearch,
             isFullscreen = isFullscreen,
@@ -186,6 +201,31 @@ class TransactionsViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = TransactionsUiState(isLoading = true)
     )
+
+    fun applyFilters(
+        period: DateFilterPeriod,
+        customStart: Long?,
+        customEnd: Long?,
+        accountId: Long?,
+        categoryIds: Set<Long>,
+        type: TransactionType?
+    ) {
+        _selectedPeriod.value = period
+        _customStartTimestamp.value = customStart
+        _customEndTimestamp.value = customEnd
+        _selectedAccountId.value = accountId
+        _selectedCategoryIds.value = categoryIds
+        _selectedType.value = type
+    }
+
+    fun resetFilters() {
+        _selectedPeriod.value = DateFilterPeriod.ALL
+        _customStartTimestamp.value = null
+        _customEndTimestamp.value = null
+        _selectedAccountId.value = null
+        _selectedCategoryIds.value = emptySet()
+        _selectedType.value = null
+    }
 
     fun setPeriod(period: DateFilterPeriod) {
         _selectedPeriod.value = period
@@ -205,8 +245,8 @@ class TransactionsViewModel(
         _selectedAccountId.value = accountId
     }
 
-    fun setCategoryFilter(categoryId: Long?) {
-        _selectedCategoryId.value = categoryId
+    fun setCategoryFilter(categoryIds: Set<Long>) {
+        _selectedCategoryIds.value = categoryIds
     }
 
     fun setZoomLevel(zoom: Float) {
