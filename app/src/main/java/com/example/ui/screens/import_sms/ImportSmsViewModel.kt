@@ -102,9 +102,12 @@ class ImportSmsViewModel(
         }
     }
 
-    fun setInitialSmsText(text: String) {
-        if (text.isNotBlank() && _uiState.value.smsText != text) {
+    fun setInitialSmsText(text: String, autoParse: Boolean = false) {
+        if (text.isNotBlank()) {
             _uiState.update { it.copy(smsText = text) }
+            if (autoParse) {
+                parseSms()
+            }
         }
     }
 

@@ -100,6 +100,7 @@ fun AmountInput(
     amount: Long,
     onAmountChange: (Long) -> Unit,
     color: Color = MaterialTheme.colorScheme.primary,
+    autoFocus: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var rawText by remember(amount) {
@@ -108,10 +109,12 @@ fun AmountInput(
     val focusRequester = remember { FocusRequester() }
     val haptic = LocalHapticFeedback.current
 
-    LaunchedEffect(Unit) {
-        try {
-            focusRequester.requestFocus()
-        } catch (_: Exception) {}
+    LaunchedEffect(autoFocus) {
+        if (autoFocus) {
+            try {
+                focusRequester.requestFocus()
+            } catch (_: Exception) {}
+        }
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -160,12 +163,19 @@ fun AmountInput(
             )
         )
 
-        // نمایش حروفی مبلغ به فارسی جهت جلوگیری از خطای تعداد صفرها
+        // نمایش زنده مبلغ به حروف با واحد «تومان»
         AnimatedVisibility(
             visible = amount > 0L,
             enter = fadeIn(),
             exit = fadeOut()
         ) {
+            val amountToman = amount / 10L
+            val wordsText = if (amountToman > 0L) {
+                NumberToWords.convert(amountToman, suffix = "تومان")
+            } else {
+                "${AmountFormatter.format(amount, includeCurrency = false)} ریال (کمتر از ۱ تومان)"
+            }
+
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -174,9 +184,9 @@ fun AmountInput(
                 color = color.copy(alpha = 0.08f)
             ) {
                 Text(
-                    text = NumberToWords.convert(amount, suffix = "ریال"),
+                    text = wordsText,
                     style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.Bold,
                     color = color,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
@@ -184,14 +194,12 @@ fun AmountInput(
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // کلیدهای کمکی مبالغ پرکاربرد و افزودن سه صفر
+        // ردیف کلید افزودن سه صفر (+۰۰۰) و پاک کردن با مکان متناسب
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             // کلید افزودن سه صفر (+۰۰۰)
@@ -202,32 +210,15 @@ fun AmountInput(
                     rawText = newAmount.toString()
                     onAmountChange(newAmount)
                 },
-                label = { Text("+۰۰۰", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                label = {
+                    Text("+۰۰۰", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                },
                 shape = RoundedCornerShape(8.dp),
                 colors = AssistChipDefaults.assistChipColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
                     labelColor = MaterialTheme.colorScheme.onSecondaryContainer
                 )
             )
-
-            // کلیدهای مبالغ رایج (۵۰، ۱۰۰، ۵۰۰ هزار و ۱ میلیون)
-            listOf(50_000L, 100_000L, 500_000L, 1_000_000L).forEach { addVal ->
-                AssistChip(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        val newAmount = amount + addVal
-                        rawText = newAmount.toString()
-                        onAmountChange(newAmount)
-                    },
-                    label = {
-                        Text(
-                            "+ " + AmountFormatter.format(addVal, includeCurrency = false),
-                            fontSize = 11.sp
-                        )
-                    },
-                    shape = RoundedCornerShape(8.dp)
-                )
-            }
 
             // کلید پاک کردن
             if (amount > 0L) {

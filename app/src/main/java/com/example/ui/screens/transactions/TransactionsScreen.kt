@@ -266,17 +266,56 @@ fun TransactionsScreen(
                     ) {
                         state.groupedTransactions.forEach { (dateHeader, transactions) ->
                             item(key = dateHeader) {
-                                Text(
-                                    text = dateHeader,
-                                    style = if (state.isFullscreen) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium,
-                                    fontSize = if (state.isFullscreen) (13.sp * state.zoomLevel) else TextUnit.Unspecified,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(
-                                        top = if (state.isFullscreen) (4.dp / state.zoomLevel).coerceIn(1.dp, 8.dp) else 8.dp,
-                                        bottom = if (state.isFullscreen) (2.dp / state.zoomLevel).coerceIn(1.dp, 4.dp) else 4.dp
+                                val dayIncome = transactions.filter { it.transaction.type == TransactionType.INCOME }.sumOf { it.transaction.amount }
+                                val dayExpense = transactions.filter { it.transaction.type == TransactionType.EXPENSE }.sumOf { it.transaction.amount }
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            top = if (state.isFullscreen) (4.dp / state.zoomLevel).coerceIn(1.dp, 8.dp) else 8.dp,
+                                            bottom = if (state.isFullscreen) (2.dp / state.zoomLevel).coerceIn(1.dp, 4.dp) else 4.dp
+                                        ),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = dateHeader,
+                                        style = if (state.isFullscreen) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium,
+                                        fontSize = if (state.isFullscreen) (13.sp * state.zoomLevel) else TextUnit.Unspecified,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
                                     )
-                                )
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        if (dayIncome > 0L) {
+                                            Text(
+                                                text = "+ " + AmountFormatter.format(dayIncome, includeCurrency = false),
+                                                color = IncomeColor,
+                                                fontSize = if (state.isFullscreen) (10.sp * state.zoomLevel) else 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        if (dayExpense > 0L) {
+                                            Text(
+                                                text = "- " + AmountFormatter.format(dayExpense, includeCurrency = false),
+                                                color = ExpenseColor,
+                                                fontSize = if (state.isFullscreen) (10.sp * state.zoomLevel) else 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        if (dayIncome > 0L || dayExpense > 0L) {
+                                            Text(
+                                                text = "ریال",
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontSize = if (state.isFullscreen) (9.sp * state.zoomLevel) else 10.sp
+                                            )
+                                        }
+                                    }
+                                }
                             }
 
                             items(transactions, key = { it.transaction.id }) { item ->

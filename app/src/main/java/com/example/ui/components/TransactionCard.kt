@@ -27,14 +27,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.entity.TransactionType
 import com.example.data.local.relation.TransactionWithDetails
-import com.example.ui.theme.ExpenseColor
-import com.example.ui.theme.IncomeColor
-import com.example.ui.theme.TransferColor
+import com.example.ui.theme.expenseColor
+import com.example.ui.theme.incomeColor
+import com.example.ui.theme.transferColor
 import com.example.util.AmountFormatter
 import com.example.util.BankLogoBadge
 import com.example.util.DateFormatter
@@ -45,11 +47,26 @@ fun TransactionCard(
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+    val expenseC = MaterialTheme.expenseColor
+    val incomeC = MaterialTheme.incomeColor
+    val transferC = MaterialTheme.transferColor
+
     val tx = transactionWithDetails.transaction
-    val (amountColor, amountPrefix, defaultIcon) = when (tx.type) {
-        TransactionType.EXPENSE -> Triple(ExpenseColor, "-", transactionWithDetails.categoryIcon ?: "more_horiz")
-        TransactionType.INCOME -> Triple(IncomeColor, "+", transactionWithDetails.categoryIcon ?: "attach_money")
-        TransactionType.TRANSFER -> Triple(TransferColor, "", "swap_horiz")
+    val amountColor: Color = when (tx.type) {
+        TransactionType.EXPENSE -> expenseC
+        TransactionType.INCOME -> incomeC
+        TransactionType.TRANSFER -> transferC
+    }
+    val amountPrefix: String = when (tx.type) {
+        TransactionType.EXPENSE -> "-"
+        TransactionType.INCOME -> "+"
+        TransactionType.TRANSFER -> ""
+    }
+    val defaultIcon: String = when (tx.type) {
+        TransactionType.EXPENSE -> transactionWithDetails.categoryIcon ?: "more_horiz"
+        TransactionType.INCOME -> transactionWithDetails.categoryIcon ?: "attach_money"
+        TransactionType.TRANSFER -> "swap_horiz"
     }
 
     val iconColor = transactionWithDetails.categoryColor?.let { Color(it) } ?: amountColor
@@ -72,7 +89,10 @@ fun TransactionCard(
                 shape = RoundedCornerShape(14.dp),
                 spotColor = Color.Black.copy(alpha = 0.05f)
             )
-            .clickable { onClick() },
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -95,7 +115,7 @@ fun TransactionCard(
                     Icon(
                         imageVector = Icons.Default.SwapHoriz,
                         contentDescription = "انتقال",
-                        tint = TransferColor,
+                        tint = transferC,
                         modifier = Modifier.size(24.dp)
                     )
                 } else {

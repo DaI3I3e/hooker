@@ -45,6 +45,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -97,7 +98,7 @@ fun ImportSmsScreen(
         }
 
         if (!raw.isNullOrBlank()) {
-            viewModel.setInitialSmsText(raw)
+            viewModel.setInitialSmsText(raw, autoParse = true)
             SharedSmsHolder.sharedText = null
         }
     }
@@ -110,6 +111,7 @@ fun ImportSmsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var isSmsExpanded by remember { mutableStateOf(false) }
 
     val (currentHour, currentMinute) = remember(state.dateTimestamp) {
         DateFormatter.extractHourAndMinute(state.dateTimestamp)
@@ -179,57 +181,105 @@ fun ImportSmsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // SMS Text Area Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            // SMS Text Area Card (Collapsible when analyzed)
+            if (state.isAnalyzed && !isSmsExpanded) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Sms,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "متن پیامک بانک",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    OutlinedTextField(
-                        value = state.smsText,
-                        onValueChange = { viewModel.onSmsTextChange(it) },
-                        placeholder = { Text("متن پیامک را اینجا پیست کنید...") },
-                        minLines = 5,
-                        maxLines = 8,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    Button(
-                        onClick = { viewModel.parseSms() },
-                        enabled = state.smsText.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Analytics,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Sms,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "پیامک تحلیل شد",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        TextButton(onClick = { isSmsExpanded = true }) {
+                            Text("تغییر متن", fontSize = 12.sp)
+                        }
+                    }
+                }
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Sms,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "متن پیامک بانک",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            if (state.isAnalyzed) {
+                                TextButton(onClick = { isSmsExpanded = false }) {
+                                    Text("بستن", fontSize = 12.sp)
+                                }
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = state.smsText,
+                            onValueChange = { viewModel.onSmsTextChange(it) },
+                            placeholder = { Text("متن پیامک را اینجا پیست کنید...") },
+                            minLines = 4,
+                            maxLines = 7,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("تحلیل پیامک", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+
+                        Button(
+                            onClick = {
+                                viewModel.parseSms()
+                                isSmsExpanded = false
+                            },
+                            enabled = state.smsText.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Analytics,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("تحلیل پیامک", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -352,10 +402,10 @@ fun ImportSmsScreen(
                             }
                         }
 
-                        // Amount Input (Toman)
+                        // Amount Input (Rial)
                         Column {
                             Text(
-                                text = "مبلغ (تومان)",
+                                text = "مبلغ (ریال)",
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold
                             )
@@ -363,6 +413,7 @@ fun ImportSmsScreen(
                             AmountInput(
                                 amount = state.amount,
                                 onAmountChange = { viewModel.setAmount(it) },
+                                autoFocus = false,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
