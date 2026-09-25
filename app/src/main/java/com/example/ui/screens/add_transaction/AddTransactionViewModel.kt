@@ -71,7 +71,12 @@ class AddTransactionViewModel(
 
             val currentType = _uiState.value.type
             val filteredCategories = filterCategories(categories, currentType)
-            val defaultCategory = filteredCategories.find { it.id == lastCatId } ?: filteredCategories.firstOrNull()
+            val preferredCatId = when (currentType) {
+                TransactionType.EXPENSE -> if (settingsRepository.lastExpenseCategoryId != 0L) settingsRepository.lastExpenseCategoryId else lastCatId
+                TransactionType.INCOME -> if (settingsRepository.lastIncomeCategoryId != 0L) settingsRepository.lastIncomeCategoryId else lastCatId
+                else -> lastCatId
+            }
+            val defaultCategory = filteredCategories.find { it.id == preferredCatId } ?: filteredCategories.firstOrNull()
 
             _uiState.value = _uiState.value.copy(
                 accounts = accounts,
@@ -87,7 +92,14 @@ class AddTransactionViewModel(
         viewModelScope.launch {
             val allCats = categoryRepository.allCategories.firstOrNull() ?: emptyList()
             val filtered = filterCategories(allCats, type)
-            val selectedCat = filtered.find { it.id == _uiState.value.selectedCategory?.id } ?: filtered.firstOrNull()
+            val preferredCatId = when (type) {
+                TransactionType.EXPENSE -> settingsRepository.lastExpenseCategoryId
+                TransactionType.INCOME -> settingsRepository.lastIncomeCategoryId
+                else -> 0L
+            }
+            val selectedCat = filtered.find { it.id == preferredCatId }
+                ?: filtered.find { it.id == _uiState.value.selectedCategory?.id }
+                ?: filtered.firstOrNull()
 
             _uiState.value = _uiState.value.copy(
                 type = type,
@@ -180,6 +192,11 @@ class AddTransactionViewModel(
                 settingsRepository.lastAccountId = state.selectedAccount.id
                 state.selectedCategory?.let { cat ->
                     settingsRepository.lastCategoryId = cat.id
+                    if (state.type == TransactionType.EXPENSE) {
+                        settingsRepository.lastExpenseCategoryId = cat.id
+                    } else if (state.type == TransactionType.INCOME) {
+                        settingsRepository.lastIncomeCategoryId = cat.id
+                    }
                 }
                 _uiState.value = _uiState.value.copy(isLoading = false, isSuccess = true)
             }.onFailure { ex ->

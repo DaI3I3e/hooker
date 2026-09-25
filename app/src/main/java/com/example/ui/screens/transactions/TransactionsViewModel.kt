@@ -28,8 +28,16 @@ enum class DateFilterPeriod(val label: String) {
     CUSTOM("دلخواه")
 }
 
+enum class TransactionSortOrder(val label: String) {
+    DATE_DESC("جدیدترین"),
+    DATE_ASC("قدیمی‌ترین"),
+    AMOUNT_DESC("بیشترین مبلغ"),
+    AMOUNT_ASC("کمترین مبلغ")
+}
+
 data class TransactionsUiState(
     val selectedPeriod: DateFilterPeriod = DateFilterPeriod.ALL,
+    val selectedSortOrder: TransactionSortOrder = TransactionSortOrder.DATE_DESC,
     val customStartTimestamp: Long? = null,
     val customEndTimestamp: Long? = null,
     val selectedType: TransactionType? = null, // null means ALL
@@ -41,6 +49,7 @@ data class TransactionsUiState(
     val zoomLevel: Float = 1.0f,
     val accounts: List<AccountEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
+    val rawFilteredTransactions: List<TransactionWithDetails> = emptyList(),
     val groupedTransactions: Map<String, List<TransactionWithDetails>> = emptyMap(),
     val totalIncome: Long = 0L,
     val totalExpense: Long = 0L,
@@ -64,6 +73,7 @@ class TransactionsViewModel(
 ) : ViewModel() {
 
     private val _selectedPeriod = MutableStateFlow(DateFilterPeriod.ALL)
+    private val _selectedSortOrder = MutableStateFlow(TransactionSortOrder.DATE_DESC)
     private val _selectedType = MutableStateFlow<TransactionType?>(null)
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
     private val _selectedCategoryIds = MutableStateFlow<Set<Long>>(emptySet())
@@ -81,6 +91,7 @@ class TransactionsViewModel(
         accountRepository.allAccounts,
         categoryRepository.allCategories,
         _selectedPeriod,
+        _selectedSortOrder,
         _selectedType,
         _selectedAccountId,
         _selectedCategoryIds,
@@ -98,17 +109,18 @@ class TransactionsViewModel(
         @Suppress("UNCHECKED_CAST")
         val categoriesList = flows[2] as List<CategoryEntity>
         val period = flows[3] as DateFilterPeriod
+        val sortOrder = flows[4] as TransactionSortOrder
         @Suppress("UNCHECKED_CAST")
-        val type = flows[4] as TransactionType?
-        val accountId = flows[5] as Long?
+        val type = flows[5] as TransactionType?
+        val accountId = flows[6] as Long?
         @Suppress("UNCHECKED_CAST")
-        val categoryIds = flows[6] as Set<Long>
-        val query = flows[7] as String
-        val isSearch = flows[8] as Boolean
-        val customStart = flows[9] as Long?
-        val customEnd = flows[10] as Long?
-        val isFullscreen = flows[11] as Boolean
-        val zoom = flows[12] as Float
+        val categoryIds = flows[7] as Set<Long>
+        val query = flows[8] as String
+        val isSearch = flows[9] as Boolean
+        val customStart = flows[10] as Long?
+        val customEnd = flows[11] as Long?
+        val isFullscreen = flows[12] as Boolean
+        val zoom = flows[13] as Float
 
         val zoneId = ZoneId.systemDefault()
         val todayJalali = JalaliDate.today(zoneId)
@@ -147,12 +159,24 @@ class TransactionsViewModel(
             // Category filter (multi-select)
             val matchesCategory = categoryIds.isEmpty() || (tx.transaction.categoryId != null && categoryIds.contains(tx.transaction.categoryId))
 
-            // Search query filter
-            val matchesQuery = query.isBlank() ||
-                (tx.transaction.note?.contains(query, ignoreCase = true) == true) ||
-                (tx.categoryName?.contains(query, ignoreCase = true) == true) ||
-                (tx.accountName?.contains(query, ignoreCase = true) == true) ||
-                (tx.toAccountName?.contains(query, ignoreCase = true) == true)
+            // Search query filter (support note, category, account, and exact or partial amount in Rial/Toman)
+            val cleanQuery = query.trim()
+            val numericQuery = cleanQuery.replace(",", "")
+                .replace("،", "")
+                .replace("۰", "0").replace("۱", "1").replace("۲", "2").replace("۳", "3").replace("۴", "4")
+                .replace("۵", "5").replace("۶", "6").replace("۷", "7").replace("۸", "8").replace("۹", "9")
+
+            val matchesAmount = numericQuery.isNotEmpty() && numericQuery.all { it.isDigit() } && (
+                tx.transaction.amount.toString().contains(numericQuery) ||
+                (tx.transaction.amount / 10).toString().contains(numericQuery)
+            )
+
+            val matchesQuery = cleanQuery.isBlank() ||
+                (tx.transaction.note?.contains(cleanQuery, ignoreCase = true) == true) ||
+                (tx.categoryName?.contains(cleanQuery, ignoreCase = true) == true) ||
+                (tx.accountName?.contains(cleanQuery, ignoreCase = true) == true) ||
+                (tx.toAccountName?.contains(cleanQuery, ignoreCase = true) == true) ||
+                matchesAmount
 
             matchesPeriod && matchesType && matchesAccount && matchesCategory && matchesQuery
         }
@@ -168,18 +192,31 @@ class TransactionsViewModel(
             }
         }
 
-        // Group by Jalali Date String
-        val grouped = filtered.groupBy { item ->
-            val jalali = JalaliDate.fromTimestamp(item.transaction.date, zoneId)
-            if (jalali == todayJalali) {
-                "امروز - ${jalali.format()}"
-            } else {
-                jalali.format(includeDayName = true)
+        // Sort transactions according to selectedSortOrder
+        val sorted = when (sortOrder) {
+            TransactionSortOrder.DATE_DESC -> filtered.sortedByDescending { it.transaction.date }
+            TransactionSortOrder.DATE_ASC -> filtered.sortedBy { it.transaction.date }
+            TransactionSortOrder.AMOUNT_DESC -> filtered.sortedByDescending { it.transaction.amount }
+            TransactionSortOrder.AMOUNT_ASC -> filtered.sortedBy { it.transaction.amount }
+        }
+
+        // Group by Jalali Date String or Sort criteria
+        val grouped = if (sortOrder == TransactionSortOrder.AMOUNT_DESC || sortOrder == TransactionSortOrder.AMOUNT_ASC) {
+            sorted.groupBy { "مرتب‌سازی: ${sortOrder.label}" }
+        } else {
+            sorted.groupBy { item ->
+                val jalali = JalaliDate.fromTimestamp(item.transaction.date, zoneId)
+                if (jalali == todayJalali) {
+                    "امروز - ${jalali.format()}"
+                } else {
+                    jalali.format(includeDayName = true)
+                }
             }
         }
 
         TransactionsUiState(
             selectedPeriod = period,
+            selectedSortOrder = sortOrder,
             customStartTimestamp = customStart,
             customEndTimestamp = customEnd,
             selectedType = type,
@@ -191,6 +228,7 @@ class TransactionsViewModel(
             zoomLevel = zoom,
             accounts = accountsList,
             categories = categoriesList,
+            rawFilteredTransactions = sorted,
             groupedTransactions = grouped,
             totalIncome = incomeSum,
             totalExpense = expenseSum,
@@ -201,6 +239,14 @@ class TransactionsViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = TransactionsUiState(isLoading = true)
     )
+
+    fun setSortOrder(order: TransactionSortOrder) {
+        _selectedSortOrder.value = order
+    }
+
+    fun exportTransactionsCsv(): String {
+        return com.example.util.CsvExporter.generateTransactionsCsv(uiState.value.rawFilteredTransactions)
+    }
 
     fun applyFilters(
         period: DateFilterPeriod,

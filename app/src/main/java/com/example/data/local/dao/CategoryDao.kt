@@ -33,6 +33,9 @@ interface CategoryDao {
     @Query("UPDATE categories SET isFavorite = :isFavorite WHERE id = :id")
     suspend fun updateFavorite(id: Long, isFavorite: Boolean)
 
+    @Query("UPDATE categories SET monthlyBudget = :budget WHERE id = :id")
+    suspend fun updateBudget(id: Long, budget: Long)
+
     @Query("SELECT * FROM categories WHERE id = :id")
     fun getById(id: Long): Flow<CategoryEntity?>
 

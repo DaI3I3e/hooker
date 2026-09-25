@@ -145,6 +145,23 @@ fun AddCategoryScreen(
                 )
             }
 
+            // Monthly Budget (for Expense/Both categories)
+            if (state.type != CategoryType.INCOME) {
+                Text("سقف بودجه ماهانه (اختیاری)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    value = if (state.monthlyBudget > 0) (state.monthlyBudget / 10).toString() else "",
+                    onValueChange = { str ->
+                        val toman = str.filter { it.isDigit() }.toLongOrNull() ?: 0L
+                        viewModel.setMonthlyBudget(toman * 10)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("سقف مجاز خرج‌کرد ماهانه (تومان)") },
+                    placeholder = { Text("مثال: ۲،۰۰۰،۰۰۰") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+
             // Icon Picker
             Text("انتخاب آیکون", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             LazyVerticalGrid(

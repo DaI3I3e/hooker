@@ -189,6 +189,36 @@ class EditTransactionViewModel(
         }
     }
 
+    fun duplicateAsNew() {
+        val state = _uiState.value
+        if (state.amount <= 0L) {
+            _uiState.value = state.copy(errorMessage = "مبلغ باید بیشتر از صفر باشد")
+            return
+        }
+        val acc = state.selectedAccount
+        if (acc == null) {
+            _uiState.value = state.copy(errorMessage = "لطفاً حساب را انتخاب کنید")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            val now = System.currentTimeMillis()
+            val newTx = TransactionEntity(
+                type = state.type,
+                amount = state.amount,
+                accountId = acc.id,
+                toAccountId = if (state.type == TransactionType.TRANSFER) state.selectedToAccount?.id else null,
+                categoryId = if (state.type != TransactionType.TRANSFER) state.selectedCategory?.id else null,
+                date = now,
+                note = state.note.ifBlank { null },
+                createdAt = now
+            )
+            transactionRepository.insertTransaction(newTx)
+            _uiState.value = _uiState.value.copy(isLoading = false, isSuccess = true)
+        }
+    }
+
     private fun filterCategories(categories: List<CategoryEntity>, type: TransactionType): List<CategoryEntity> {
         return when (type) {
             TransactionType.EXPENSE -> categories.filter { it.type == CategoryType.EXPENSE || it.type == CategoryType.BOTH }

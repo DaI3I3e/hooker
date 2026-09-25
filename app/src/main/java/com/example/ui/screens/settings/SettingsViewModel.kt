@@ -20,6 +20,8 @@ data class SettingsUiState(
     val themeMode: String = "SYSTEM",
     val lastBackupTime: Long = 0L,
     val lastBackupTimeFormatted: String = "هرگز",
+    val isBiometricEnabled: Boolean = false,
+    val isSecureScreenEnabled: Boolean = false,
     val isLoading: Boolean = false,
     val userMessage: String? = null,
     val isErrorMessage: Boolean = false,
@@ -45,10 +47,32 @@ class SettingsViewModel(
         SettingsUiState(
             themeMode = settingsRepository.themeMode,
             lastBackupTime = settingsRepository.lastBackupTime,
-            lastBackupTimeFormatted = DateFormatter.formatDateTime(settingsRepository.lastBackupTime)
+            lastBackupTimeFormatted = DateFormatter.formatDateTime(settingsRepository.lastBackupTime),
+            isBiometricEnabled = settingsRepository.isBiometricEnabled,
+            isSecureScreenEnabled = settingsRepository.isSecureScreenEnabled
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        settingsRepository.isBiometricEnabled = enabled
+        _uiState.update {
+            it.copy(
+                isBiometricEnabled = enabled,
+                userMessage = if (enabled) "قفل امنیتی فعال شد" else "قفل امنیتی غیرفعال شد"
+            )
+        }
+    }
+
+    fun setSecureScreenEnabled(enabled: Boolean) {
+        settingsRepository.isSecureScreenEnabled = enabled
+        _uiState.update {
+            it.copy(
+                isSecureScreenEnabled = enabled,
+                userMessage = if (enabled) "حفاظت در برنامه‌های اخیر فعال شد" else "حفاظت در برنامه‌های اخیر غیرفعال شد"
+            )
+        }
+    }
 
     fun setThemeMode(mode: String) {
         settingsRepository.themeMode = mode

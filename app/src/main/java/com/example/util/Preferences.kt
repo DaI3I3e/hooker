@@ -17,6 +17,14 @@ class Preferences(context: Context) {
         get() = prefs.getLong(Constants.KEY_LAST_CATEGORY_ID, 0L)
         set(value) = prefs.edit().putLong(Constants.KEY_LAST_CATEGORY_ID, value).apply()
 
+    var lastExpenseCategoryId: Long
+        get() = prefs.getLong(Constants.KEY_LAST_EXPENSE_CATEGORY_ID, 0L)
+        set(value) = prefs.edit().putLong(Constants.KEY_LAST_EXPENSE_CATEGORY_ID, value).apply()
+
+    var lastIncomeCategoryId: Long
+        get() = prefs.getLong(Constants.KEY_LAST_INCOME_CATEGORY_ID, 0L)
+        set(value) = prefs.edit().putLong(Constants.KEY_LAST_INCOME_CATEGORY_ID, value).apply()
+
     var themeMode: String
         get() = prefs.getString(Constants.KEY_THEME_MODE, "SYSTEM") ?: "SYSTEM"
         set(value) = prefs.edit().putString(Constants.KEY_THEME_MODE, value).apply()
@@ -24,4 +32,12 @@ class Preferences(context: Context) {
     var lastBackupTime: Long
         get() = prefs.getLong(Constants.KEY_LAST_BACKUP_TIME, 0L)
         set(value) = prefs.edit().putLong(Constants.KEY_LAST_BACKUP_TIME, value).apply()
+
+    var isBiometricEnabled: Boolean
+        get() = prefs.getBoolean(Constants.KEY_BIOMETRIC_ENABLED, false)
+        set(value) = prefs.edit().putBoolean(Constants.KEY_BIOMETRIC_ENABLED, value).apply()
+
+    var isSecureScreenEnabled: Boolean
+        get() = prefs.getBoolean(Constants.KEY_SECURE_SCREEN_ENABLED, false)
+        set(value) = prefs.edit().putBoolean(Constants.KEY_SECURE_SCREEN_ENABLED, value).apply()
 }

@@ -19,6 +19,7 @@ data class AddCategoryUiState(
     val color: Int = 0xFFE53935.toInt(),
     val icon: String = "more_horiz",
     val isDefault: Boolean = false,
+    val monthlyBudget: Long = 0L,
     val isEditing: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
@@ -57,6 +58,7 @@ class AddCategoryViewModel(
                     color = cat.color,
                     icon = cat.icon,
                     isDefault = cat.isDefault,
+                    monthlyBudget = cat.monthlyBudget,
                     isEditing = true
                 )
             }
@@ -79,6 +81,10 @@ class AddCategoryViewModel(
         _uiState.value = _uiState.value.copy(icon = icon)
     }
 
+    fun setMonthlyBudget(budget: Long) {
+        _uiState.value = _uiState.value.copy(monthlyBudget = budget)
+    }
+
     fun saveCategory() {
         val state = _uiState.value
         if (state.name.isBlank()) {
@@ -96,6 +102,7 @@ class AddCategoryViewModel(
                 color = state.color,
                 icon = state.icon,
                 isDefault = state.isDefault,
+                monthlyBudget = if (state.type != CategoryType.INCOME) state.monthlyBudget else 0L,
                 createdAt = System.currentTimeMillis()
             )
 

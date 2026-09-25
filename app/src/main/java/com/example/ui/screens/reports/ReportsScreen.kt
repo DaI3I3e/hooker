@@ -21,11 +21,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,11 +43,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.platform.LocalContext
+import com.example.data.local.entity.CategoryEntity
+import com.example.data.local.entity.CategoryType
+import com.example.util.CsvExporter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -80,7 +95,9 @@ fun ReportsScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var showFilterBottomSheet by remember { mutableStateOf(false) }
+    var editingCategoryBudget by remember { mutableStateOf<CategoryEntity?>(null) }
 
     LaunchedEffect(state.isFullscreen) {
         onToggleFullscreen(state.isFullscreen)
@@ -139,6 +156,18 @@ fun ReportsScreen(
                         }
                     }
                     IconButton(
+                        onClick = {
+                            val csv = viewModel.exportReportCsv()
+                            CsvExporter.shareCsv(context, csv, "fintrack_report.csv")
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = "خروجی اکسل (CSV)",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(
                         onClick = { viewModel.toggleFullscreen() }
                     ) {
                         Icon(
@@ -161,6 +190,11 @@ fun ReportsScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Financial Insights Card (Month-over-Month comparison & daily average)
+                item {
+                    FinancialInsightCard(insight = state.financialInsight)
+                }
+
                 // Summary Card (Income / Expense / Balance)
                 item {
                     ReportSummaryCard(
@@ -232,6 +266,15 @@ fun ReportsScreen(
                     MonthlyTrendCard(monthlyTrends = state.monthlyTrends)
                 }
 
+                // Category Budgeting Section (Monthly spending limits)
+                item {
+                    CategoryBudgetSection(
+                        budgetList = state.budgetProgressList,
+                        allCategories = state.categories,
+                        onSetBudgetClick = { editingCategoryBudget = it }
+                    )
+                }
+
                 // Category Breakdowns List Header
                 item {
                     Text(
@@ -283,6 +326,16 @@ fun ReportsScreen(
                 }
             }
         }
+    }
+
+    editingCategoryBudget?.let { cat ->
+        BudgetEditDialog(
+            category = cat,
+            onDismiss = { editingCategoryBudget = null },
+            onSave = { newBudget ->
+                viewModel.updateCategoryBudget(cat.id, newBudget)
+            }
+        )
     }
 }
 
@@ -712,4 +765,411 @@ fun CategorySummaryItem(
             )
         }
     }
+}
+
+@Composable
+fun FinancialInsightCard(
+    insight: FinancialInsight?,
+    modifier: Modifier = Modifier
+) {
+    if (insight == null || (insight.currentMonthExpense == 0L && insight.lastMonthExpense == 0L)) return
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Savings,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "هوش و بینش مالی",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "تحلیل هوشمند خرج‌کرد ماه جاری نسبت به گذشته",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Month over Month diff badge
+            if (insight.expenseDiffPercent != null) {
+                val isIncreased = insight.isExpenseIncreased
+                val diffAbs = kotlin.math.abs(insight.expenseDiffPercent)
+                val diffFormatted = String.format("%.1f", diffAbs).toPersianDigits()
+                val badgeColor = if (isIncreased) ExpenseColor else IncomeColor
+                val icon = if (isIncreased) Icons.Default.TrendingUp else Icons.Default.TrendingDown
+                val statusText = if (isIncreased) {
+                    "نسبت به ماه قبل $diffFormatted٪ بیشتر خرج کرده‌اید."
+                } else {
+                    "نسبت به ماه قبل $diffFormatted٪ صرفه‌جویی و کمتر خرج کرده‌اید! 👏"
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(badgeColor.copy(alpha = 0.12f))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(imageVector = icon, contentDescription = null, tint = badgeColor, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = badgeColor
+                    )
+                }
+            }
+
+            // Stats Row: Daily Average & Top Category
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Daily average
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text(
+                            text = "میانگین روزانه",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = AmountFormatter.format(insight.dailyAverageExpenseThisMonth),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                // Top Spending Category
+                if (insight.topSpendingCategoryName != null && insight.topSpendingCategoryPercent > 0) {
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "بیشترین خرج ماه",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${insight.topSpendingCategoryName} (${String.format("%.0f", insight.topSpendingCategoryPercent).toPersianDigits()}٪)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryBudgetSection(
+    budgetList: List<CategoryBudgetProgress>,
+    allCategories: List<CategoryEntity>,
+    onSetBudgetClick: (CategoryEntity) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccountBalanceWallet,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "سقف بودجه ماهانه دسته‌ها",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "کنترل و مدیریت سقف هزینه‌ها در ماه جاری",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (budgetList.isEmpty()) {
+                Text(
+                    text = "هنوز سقف بودجه‌ای برای دسته‌بندی‌ها تنظیم نشده است. می‌توانید با کلیک روی دسته‌ها سقف هزینه تعیین کنید.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                budgetList.forEach { item ->
+                    val progressFraction = (item.percentage / 100f).coerceIn(0f, 1f)
+                    val progressColor = when {
+                        item.percentage >= 100f -> ExpenseColor
+                        item.percentage >= 75f -> Color(0xFFF57C00) // Orange warning
+                        else -> IncomeColor
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                            .clickable { onSetBudgetClick(item.category) }
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(item.category.color).copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = getCategoryIcon(item.category.icon),
+                                        contentDescription = null,
+                                        tint = Color(item.category.color),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = item.category.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Text(
+                                text = "${AmountFormatter.format(item.spentThisMonth)} از ${AmountFormatter.format(item.budget)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        LinearProgressIndicator(
+                            progress = { progressFraction },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(CircleShape),
+                            color = progressColor,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            if (item.isOverBudget) {
+                                Text(
+                                    text = "⚠️ عبور از سقف مجاز (${String.format("%.0f", item.percentage).toPersianDigits()}٪)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ExpenseColor,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            } else {
+                                Text(
+                                    text = "باقیمانده: ${AmountFormatter.format(item.remaining)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = IncomeColor,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "${String.format("%.0f", item.percentage).toPersianDigits()}٪ مصرف شده",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Quick button to pick an expense category and set budget
+            val expenseCats = allCategories.filter { it.type == CategoryType.EXPENSE || it.type == CategoryType.BOTH }
+            if (expenseCats.isNotEmpty()) {
+                var showCatPickerForBudget by remember { mutableStateOf(false) }
+                OutlinedButton(
+                    onClick = { showCatPickerForBudget = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("تنظیم یا تغییر سقف بودجه دسته‌ها")
+                }
+
+                if (showCatPickerForBudget) {
+                    AlertDialog(
+                        onDismissRequest = { showCatPickerForBudget = false },
+                        title = { Text("انتخاب دسته برای سقف بودجه", fontWeight = FontWeight.Bold) },
+                        text = {
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(expenseCats) { cat ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable {
+                                                showCatPickerForBudget = false
+                                                onSetBudgetClick(cat)
+                                            }
+                                            .padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(cat.color).copy(alpha = 0.2f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = getCategoryIcon(cat.icon),
+                                                contentDescription = null,
+                                                tint = Color(cat.color),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(text = cat.name, fontWeight = FontWeight.SemiBold)
+                                        Spacer(modifier = Modifier.weight(1f))
+                                        if (cat.monthlyBudget > 0) {
+                                            Text(
+                                                text = AmountFormatter.format(cat.monthlyBudget),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {},
+                        dismissButton = {
+                            TextButton(onClick = { showCatPickerForBudget = false }) { Text("بستن") }
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BudgetEditDialog(
+    category: CategoryEntity,
+    onDismiss: () -> Unit,
+    onSave: (Long) -> Unit
+) {
+    var budgetText by remember { mutableStateOf(if (category.monthlyBudget > 0) (category.monthlyBudget / 10).toString() else "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("سقف بودجه ماهانه: ${category.name}", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "سقف مجاز خرج‌کرد ماهانه این دسته را به تومان وارد کنید (برای حذف سقف، عدد ۰ را بگذارید):",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = budgetText,
+                    onValueChange = { budgetText = it.filter { ch -> ch.isDigit() } },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("سقف ماهانه (تومان)") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val toman = budgetText.toLongOrNull() ?: 0L
+                val rial = toman * 10
+                onSave(rial)
+                onDismiss()
+            }) {
+                Text("ذخیره سقف")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("انصراف") }
+        }
+    )
 }

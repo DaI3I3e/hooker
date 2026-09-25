@@ -28,6 +28,9 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Pattern
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -37,6 +40,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -44,9 +48,13 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.fragment.app.FragmentActivity
+import com.example.util.BiometricAuthStatus
+import com.example.util.BiometricHelper
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -260,6 +268,59 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
+
+            // Security Settings Card
+            item {
+                SecuritySettingsCard(
+                    isBiometricEnabled = state.isBiometricEnabled,
+                    isSecureScreenEnabled = state.isSecureScreenEnabled,
+                    onToggleBiometric = { enabled ->
+                        if (enabled) {
+                            val activity = context as? FragmentActivity
+                            val status = BiometricHelper.checkBiometricStatus(context)
+                            when (status) {
+                                BiometricAuthStatus.AVAILABLE -> {
+                                    if (activity != null) {
+                                        BiometricHelper.authenticate(
+                                            activity = activity,
+                                            title = "فعال‌سازی قفل امنیتی",
+                                            subtitle = "برای فعال‌سازی قفل، اثر انگشت یا رمز خود را تأیید کنید",
+                                            onSuccess = {
+                                                viewModel.setBiometricEnabled(true)
+                                            },
+                                            onError = { err ->
+                                                Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                    } else {
+                                        viewModel.setBiometricEnabled(true)
+                                    }
+                                }
+                                BiometricAuthStatus.NOT_ENROLLED -> {
+                                    Toast.makeText(
+                                        context,
+                                        "هیچ اثر انگشت یا رمزی روی دستگاه تعریف نشده است.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                                BiometricAuthStatus.NOT_AVAILABLE,
+                                BiometricAuthStatus.UNSUPPORTED -> {
+                                    Toast.makeText(
+                                        context,
+                                        "حسگر بیومتریک یا قفل دستگاه در دسترس نیست.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        } else {
+                            viewModel.setBiometricEnabled(false)
+                        }
+                    },
+                    onToggleSecureScreen = { enabled ->
+                        viewModel.setSecureScreenEnabled(enabled)
+                    }
+                )
             }
 
             // Theme Mode Card
@@ -692,7 +753,7 @@ fun AboutAppCard() {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "نسخه ۴.۰".toPersianDigits(),
+                    text = "نسخه ۵.۰".toPersianDigits(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -701,6 +762,134 @@ fun AboutAppCard() {
                     text = "برنامه هوشمند مدیریت مالی شخصی، حساب‌ها و تراکنش‌ها به صورت ۱۰۰٪ آفلاین و امن روی دستگاه شما.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SecuritySettingsCard(
+    isBiometricEnabled: Boolean,
+    isSecureScreenEnabled: Boolean,
+    onToggleBiometric: (Boolean) -> Unit,
+    onToggleSecureScreen: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Security,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "امنیت و حریم خصوصی",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "حفاظت از اطلاعات مالی و موجودی‌ها",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            // Row 1: Biometric Lock
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Fingerprint,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "قفل بیومتریک و رمز عبور",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "احراز هویت با اثر انگشت یا پین هنگام ورود",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Switch(
+                    checked = isBiometricEnabled,
+                    onCheckedChange = onToggleBiometric
+                )
+            }
+
+            // Row 2: Secure Screen (Recent Apps / Screenshot protection)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.VisibilityOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "مخفی‌سازی در برنامه‌های اخیر",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "جلوگیری از نمایش اطلاعات مالی در Recent Apps",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Switch(
+                    checked = isSecureScreenEnabled,
+                    onCheckedChange = onToggleSecureScreen
                 )
             }
         }

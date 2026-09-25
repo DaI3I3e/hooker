@@ -15,6 +15,7 @@ import com.example.domain.model.CategorySummary
 import com.example.ui.screens.transactions.DateFilterPeriod
 import com.example.util.JalaliDate
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,25 @@ data class MonthlyTrend(
     val month: Int,
     val income: Long,
     val expense: Long
+)
+
+data class CategoryBudgetProgress(
+    val category: CategoryEntity,
+    val spentThisMonth: Long,
+    val budget: Long,
+    val percentage: Float,
+    val remaining: Long,
+    val isOverBudget: Boolean
+)
+
+data class FinancialInsight(
+    val currentMonthExpense: Long,
+    val lastMonthExpense: Long,
+    val expenseDiffPercent: Double?,
+    val isExpenseIncreased: Boolean,
+    val dailyAverageExpenseThisMonth: Long,
+    val topSpendingCategoryName: String?,
+    val topSpendingCategoryPercent: Float
 )
 
 data class ReportsUiState(
@@ -45,6 +65,9 @@ data class ReportsUiState(
     val netBalance: Long = 0L,
     val categorySummaries: List<CategorySummary> = emptyList(),
     val monthlyTrends: List<MonthlyTrend> = emptyList(),
+    val budgetProgressList: List<CategoryBudgetProgress> = emptyList(),
+    val financialInsight: FinancialInsight? = null,
+    val filteredTransactions: List<TransactionWithDetails> = emptyList(),
     val currentStartTimestamp: Long = 0L,
     val currentEndTimestamp: Long = Long.MAX_VALUE,
     val isLoading: Boolean = false
@@ -234,6 +257,69 @@ class ReportsViewModel(
             )
         }
 
+        // 1. Month-over-Month & Financial Insights
+        val curMonthStart = JalaliDate(todayJalali.year, todayJalali.month, 1).toStartOfDayTimestamp(zoneId)
+        val curMonthEnd = JalaliDate(todayJalali.year, todayJalali.month, JalaliDate.getJalaliMonthLength(todayJalali.year, todayJalali.month)).toEndOfDayTimestamp(zoneId)
+
+        val prevY = if (todayJalali.month == 1) todayJalali.year - 1 else todayJalali.year
+        val prevM = if (todayJalali.month == 1) 12 else todayJalali.month - 1
+        val prevMonthStart = JalaliDate(prevY, prevM, 1).toStartOfDayTimestamp(zoneId)
+        val prevMonthEnd = JalaliDate(prevY, prevM, JalaliDate.getJalaliMonthLength(prevY, prevM)).toEndOfDayTimestamp(zoneId)
+
+        var curMonthExpense = 0L
+        var prevMonthExpense = 0L
+        val curMonthCategoryExpenses = mutableMapOf<Long, Long>()
+
+        for (txItem in allTxWithDetails) {
+            val tx = txItem.transaction
+            if (accountId != null && tx.accountId != accountId) continue
+            if (tx.type == TransactionType.EXPENSE) {
+                if (tx.date in curMonthStart..curMonthEnd) {
+                    curMonthExpense += tx.amount
+                    val catId = tx.categoryId ?: 0L
+                    curMonthCategoryExpenses[catId] = (curMonthCategoryExpenses[catId] ?: 0L) + tx.amount
+                } else if (tx.date in prevMonthStart..prevMonthEnd) {
+                    prevMonthExpense += tx.amount
+                }
+            }
+        }
+
+        val diffPercent: Double? = if (prevMonthExpense > 0) {
+            ((curMonthExpense - prevMonthExpense).toDouble() / prevMonthExpense.toDouble()) * 100.0
+        } else null
+
+        val topCategoryEntry = curMonthCategoryExpenses.maxByOrNull { it.value }
+        val topCategoryName = topCategoryEntry?.let { entry ->
+            categoriesList.find { it.id == entry.key }?.name ?: "نامشخص"
+        }
+        val topCategoryPercent = if (curMonthExpense > 0 && topCategoryEntry != null) {
+            (topCategoryEntry.value.toFloat() / curMonthExpense.toFloat()) * 100f
+        } else 0f
+
+        val insight = FinancialInsight(
+            currentMonthExpense = curMonthExpense,
+            lastMonthExpense = prevMonthExpense,
+            expenseDiffPercent = diffPercent,
+            isExpenseIncreased = curMonthExpense > prevMonthExpense,
+            dailyAverageExpenseThisMonth = curMonthExpense / maxOf(1, todayJalali.day),
+            topSpendingCategoryName = topCategoryName,
+            topSpendingCategoryPercent = topCategoryPercent
+        )
+
+        // 2. Category Budget Progress
+        val budgetProgressList = categoriesList.filter { it.monthlyBudget > 0 }.map { cat ->
+            val spent = curMonthCategoryExpenses[cat.id] ?: 0L
+            val pct = (spent.toFloat() / cat.monthlyBudget.toFloat()) * 100f
+            CategoryBudgetProgress(
+                category = cat,
+                spentThisMonth = spent,
+                budget = cat.monthlyBudget,
+                percentage = pct,
+                remaining = maxOf(0L, cat.monthlyBudget - spent),
+                isOverBudget = spent > cat.monthlyBudget
+            )
+        }
+
         ReportsUiState(
             selectedPeriod = period,
             customStartTimestamp = customStart,
@@ -249,6 +335,9 @@ class ReportsViewModel(
             netBalance = incomeSum - expenseSum,
             categorySummaries = summaries,
             monthlyTrends = sixMonthsTrends,
+            budgetProgressList = budgetProgressList,
+            financialInsight = insight,
+            filteredTransactions = inRange,
             currentStartTimestamp = start,
             currentEndTimestamp = end,
             isLoading = false
@@ -258,6 +347,16 @@ class ReportsViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = ReportsUiState(isLoading = true)
     )
+
+    fun exportReportCsv(): String {
+        return com.example.util.CsvExporter.generateTransactionsCsv(uiState.value.filteredTransactions)
+    }
+
+    fun updateCategoryBudget(categoryId: Long, budget: Long) {
+        viewModelScope.launch {
+            categoryRepository.updateBudget(categoryId, budget)
+        }
+    }
 
     fun applyFilters(
         period: DateFilterPeriod,

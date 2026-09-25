@@ -29,4 +29,8 @@ class CategoryRepository(private val categoryDao: CategoryDao) {
     suspend fun toggleFavorite(category: CategoryEntity) = withContext(Dispatchers.IO) {
         categoryDao.updateFavorite(category.id, !category.isFavorite)
     }
+
+    suspend fun updateBudget(categoryId: Long, budget: Long) = withContext(Dispatchers.IO) {
+        categoryDao.updateBudget(categoryId, budget)
+    }
 }

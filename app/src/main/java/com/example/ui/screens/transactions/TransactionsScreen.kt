@@ -20,13 +20,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -78,6 +82,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.entity.TransactionEntity
 import com.example.data.local.entity.TransactionType
 import com.example.data.local.relation.TransactionWithDetails
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.ModalBottomSheet
 import com.example.ui.components.FilterBottomSheet
 import com.example.ui.components.TransactionCard
 import com.example.ui.components.getCategoryIcon
@@ -85,6 +91,7 @@ import com.example.ui.theme.ExpenseColor
 import com.example.ui.theme.IncomeColor
 import com.example.ui.theme.TransferColor
 import com.example.util.AmountFormatter
+import com.example.util.CsvExporter
 import com.example.util.DateFormatter
 import com.example.util.toPersianDigits
 import kotlinx.coroutines.launch
@@ -100,9 +107,11 @@ fun TransactionsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var transactionToDelete by remember { mutableStateOf<TransactionEntity?>(null) }
     var showFilterBottomSheet by remember { mutableStateOf(false) }
+    var showSortBottomSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isFullscreen) {
         onToggleFullscreen(state.isFullscreen)
@@ -135,6 +144,58 @@ fun TransactionsScreen(
                 showFilterBottomSheet = false
             }
         )
+    }
+
+    if (showSortBottomSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSortBottomSheet = false }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = "مرتب‌سازی تراکنش‌ها",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                TransactionSortOrder.entries.forEach { order ->
+                    val isSelected = state.selectedSortOrder == order
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent)
+                            .clickable {
+                                viewModel.setSortOrder(order)
+                                showSortBottomSheet = false
+                            }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = order.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+                Spacer(modifier = Modifier.height(28.dp))
+            }
+        }
     }
 
     if (transactionToDelete != null) {
@@ -220,6 +281,27 @@ fun TransactionsScreen(
                                     contentDescription = "فیلترها"
                                 )
                             }
+                        }
+                        IconButton(
+                            onClick = { showSortBottomSheet = true }
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Sort,
+                                contentDescription = "مرتب‌سازی",
+                                tint = if (state.selectedSortOrder != TransactionSortOrder.DATE_DESC) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                val csv = viewModel.exportTransactionsCsv()
+                                CsvExporter.shareCsv(context, csv, "fintrack_transactions.csv")
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FileDownload,
+                                contentDescription = "خروجی اکسل (CSV)",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                         IconButton(
                             onClick = { viewModel.toggleFullscreen() }
