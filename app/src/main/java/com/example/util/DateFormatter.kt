@@ -1,6 +1,8 @@
 package com.example.util
 
 object DateFormatter {
+    fun formatJalali(timestamp: Long): String = formatMedium(timestamp)
+
     fun formatShort(timestamp: Long): String {
         return try {
             val validTs = if (timestamp > 0L) timestamp else System.currentTimeMillis()

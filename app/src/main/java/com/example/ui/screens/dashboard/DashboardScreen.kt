@@ -32,6 +32,8 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RemoveCircle
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -88,6 +90,9 @@ fun DashboardScreen(
     onNavigateToScanSms: () -> Unit = {},
     onNavigateToImportSms: () -> Unit = {},
     onNavigateToTransfer: () -> Unit = {},
+    onNavigateToRecurring: () -> Unit = {},
+    onNavigateToSavingsGoals: () -> Unit = {},
+    onNavigateToCheques: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -161,11 +166,41 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Row 2: گزارش‌ها، وارد کردن پیامک، تنظیمات
+                // Row 2: تراکنش‌های دوره‌ای، اهداف پس‌انداز، چک‌های صیادی، گزارش‌ها
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
+                    QuickAccessItem(
+                        title = "دوره‌ای و قسط",
+                        icon = Icons.Default.Repeat,
+                        color = Color(0xFF0288D1),
+                        onClick = {
+                            showMoreBottomSheet = false
+                            onNavigateToRecurring()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    QuickAccessItem(
+                        title = "اهداف پس‌انداز",
+                        icon = Icons.Default.Savings,
+                        color = Color(0xFF00897B),
+                        onClick = {
+                            showMoreBottomSheet = false
+                            onNavigateToSavingsGoals()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    QuickAccessItem(
+                        title = "چک صیادی",
+                        icon = Icons.Default.ReceiptLong,
+                        color = Color(0xFF7B1FA2),
+                        onClick = {
+                            showMoreBottomSheet = false
+                            onNavigateToCheques()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
                     QuickAccessItem(
                         title = "گزارش‌ها",
                         icon = Icons.Default.BarChart,
@@ -176,6 +211,15 @@ fun DashboardScreen(
                         },
                         modifier = Modifier.weight(1f)
                     )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Row 3: وارد کردن پیامک، تنظیمات
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
                     QuickAccessItem(
                         title = "وارد کردن پیامک",
                         icon = Icons.Default.MailOutline,
@@ -196,6 +240,7 @@ fun DashboardScreen(
                         },
                         modifier = Modifier.weight(1f)
                     )
+                    Spacer(modifier = Modifier.weight(1f))
                     Spacer(modifier = Modifier.weight(1f))
                 }
                 Spacer(modifier = Modifier.height(28.dp))
@@ -221,21 +266,12 @@ fun DashboardScreen(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onNavigateToScanSms) {
-                        Icon(
-                            imageVector = Icons.Default.Sms,
-                            contentDescription = "اسکن سریع پیامک",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "تنظیمات",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                IconButton(onClick = onNavigateToSettings) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "تنظیمات",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -326,6 +362,39 @@ fun DashboardScreen(
                         )
                     }
                 }
+            }
+        }
+
+        // Phase 3 Shortcuts: اقساط و دوره‌ای، اهداف پس‌انداز، چک صیادی
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Phase3ShortcutCard(
+                    title = "اقساط و دوره‌ای",
+                    subtitle = "تعهدات منظم",
+                    icon = Icons.Default.Repeat,
+                    color = Color(0xFF0288D1),
+                    onClick = onNavigateToRecurring,
+                    modifier = Modifier.weight(1f)
+                )
+                Phase3ShortcutCard(
+                    title = "اهداف پس‌انداز",
+                    subtitle = "قلک و پس‌انداز",
+                    icon = Icons.Default.Savings,
+                    color = Color(0xFF00897B),
+                    onClick = onNavigateToSavingsGoals,
+                    modifier = Modifier.weight(1f)
+                )
+                Phase3ShortcutCard(
+                    title = "چک صیادی",
+                    subtitle = "دریافتی/پرداختی",
+                    icon = Icons.Default.ReceiptLong,
+                    color = Color(0xFF7B1FA2),
+                    onClick = onNavigateToCheques,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
@@ -565,4 +634,67 @@ fun QuickActionButton(
         )
     }
 }
+
+@Composable
+private fun Phase3ShortcutCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
 

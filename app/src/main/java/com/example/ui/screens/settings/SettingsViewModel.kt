@@ -101,6 +101,15 @@ class SettingsViewModel(
     }
 
     fun onFileSelectedForRestore(jsonString: String) {
+        if (jsonString.length > 20_000_000) {
+            _uiState.update {
+                it.copy(
+                    userMessage = "حجم فایل انتخاب‌شده بیش از حد مجاز است.",
+                    isErrorMessage = true
+                )
+            }
+            return
+        }
         val isValid = backupManager.validateBackupJson(jsonString)
         if (!isValid) {
             _uiState.update {

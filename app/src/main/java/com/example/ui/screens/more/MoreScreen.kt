@@ -12,15 +12,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,6 +48,9 @@ fun MoreScreen(
     onNavigateToAccounts: () -> Unit,
     onNavigateToCategories: () -> Unit,
     onNavigateToDebts: () -> Unit,
+    onNavigateToRecurring: () -> Unit = {},
+    onNavigateToSavingsGoals: () -> Unit = {},
+    onNavigateToCheques: () -> Unit = {},
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -60,6 +66,7 @@ fun MoreScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -73,15 +80,39 @@ fun MoreScreen(
 
             MoreMenuItem(
                 title = "دسته‌بندی‌ها",
-                subtitle = "مدیریت دسته‌های هزینه و درآمد",
+                subtitle = "مدیریت دسته‌های هزینه و درآمد و بودجه‌بندی",
                 icon = Icons.Default.Category,
                 iconColor = MaterialTheme.colorScheme.secondary,
                 onClick = onNavigateToCategories
             )
 
             MoreMenuItem(
+                title = "تراکنش‌های دوره‌ای و اقساط",
+                subtitle = "پیگیری پرداخت‌های منظم، حقوق و اقساط وام",
+                icon = Icons.Default.Repeat,
+                iconColor = Color(0xFF1E88E5),
+                onClick = onNavigateToRecurring
+            )
+
+            MoreMenuItem(
+                title = "صندوق‌ها و اهداف پس‌انداز",
+                subtitle = "قلک‌های مالی، برنامه‌ریزی خرید و پس‌انداز",
+                icon = Icons.Default.Savings,
+                iconColor = Color(0xFF00897B),
+                onClick = onNavigateToSavingsGoals
+            )
+
+            MoreMenuItem(
+                title = "مدیریت چک‌های صیادی",
+                subtitle = "دفترچه چک، پیگیری چک‌های دریافتی، پرداختی و سررسیدها",
+                icon = Icons.Default.ReceiptLong,
+                iconColor = Color(0xFF8E24AA),
+                onClick = onNavigateToCheques
+            )
+
+            MoreMenuItem(
                 title = "بدهی و طلب",
-                subtitle = "مدیریت و پیگیری بدهی‌ها و طلب‌ها",
+                subtitle = "مدیریت و پیگیری بدهی‌ها و طلب‌ها با دیگران",
                 icon = Icons.Default.Receipt,
                 iconColor = MaterialTheme.colorScheme.tertiary,
                 onClick = onNavigateToDebts
@@ -89,7 +120,7 @@ fun MoreScreen(
 
             MoreMenuItem(
                 title = "تنظیمات",
-                subtitle = "پشتیبان‌گیری، پوسته و تنظیمات برنامه",
+                subtitle = "پشتیبان‌گیری، امنیت، پوسته و تنظیمات برنامه",
                 icon = Icons.Default.Settings,
                 iconColor = MaterialTheme.colorScheme.outline,
                 onClick = onNavigateToSettings
