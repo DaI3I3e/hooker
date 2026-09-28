@@ -17,5 +17,6 @@ data class CategoryEntity(
     val icon: String,
     val isDefault: Boolean = false,
     val isFavorite: Boolean = false,
+    val monthlyBudget: Long = 0L,
     val createdAt: Long = System.currentTimeMillis()
 )

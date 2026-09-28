@@ -29,6 +29,9 @@ interface RecurringDao {
     @Query("SELECT * FROM recurring_transactions WHERE id = :id")
     fun getById(id: Long): Flow<RecurringTransactionEntity?>
 
+    @Query("SELECT * FROM recurring_transactions")
+    fun getAllEntities(): Flow<List<RecurringTransactionEntity>>
+
     @Transaction
     @Query("""
         SELECT r.*,

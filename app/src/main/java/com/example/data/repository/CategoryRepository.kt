@@ -10,6 +10,8 @@ import kotlinx.coroutines.withContext
 class CategoryRepository(private val categoryDao: CategoryDao) {
     val allCategories: Flow<List<CategoryEntity>> = categoryDao.getAll()
 
+    fun getAll(): Flow<List<CategoryEntity>> = allCategories
+
     fun getCategoriesByType(type: CategoryType): Flow<List<CategoryEntity>> = categoryDao.getByType(type)
 
     fun getCategoryById(id: Long): Flow<CategoryEntity?> = categoryDao.getById(id)
@@ -20,6 +22,10 @@ class CategoryRepository(private val categoryDao: CategoryDao) {
 
     suspend fun updateCategory(category: CategoryEntity) = withContext(Dispatchers.IO) {
         categoryDao.update(category)
+    }
+
+    suspend fun updateBudget(categoryId: Long, budget: Long) = withContext(Dispatchers.IO) {
+        categoryDao.updateBudget(categoryId, budget)
     }
 
     suspend fun deleteCategory(category: CategoryEntity) = withContext(Dispatchers.IO) {
