@@ -8,19 +8,9 @@ import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.local.dao.AccountDao
 import com.example.data.local.dao.CategoryDao
-import com.example.data.local.dao.ChequeDao
-import com.example.data.local.dao.DebtDao
-import com.example.data.local.dao.RecurringDao
-import com.example.data.local.dao.SavingsGoalDao
-import com.example.data.local.dao.SmsPatternDao
 import com.example.data.local.dao.TransactionDao
 import com.example.data.local.entity.AccountEntity
 import com.example.data.local.entity.CategoryEntity
-import com.example.data.local.entity.ChequeEntity
-import com.example.data.local.entity.DebtEntity
-import com.example.data.local.entity.RecurringTransactionEntity
-import com.example.data.local.entity.SavingsGoalEntity
-import com.example.data.local.entity.SmsPatternEntity
 import com.example.data.local.entity.TransactionEntity
 import com.example.util.Constants
 import kotlinx.coroutines.CoroutineScope
@@ -32,13 +22,10 @@ import kotlinx.coroutines.launch
         AccountEntity::class,
         CategoryEntity::class,
         TransactionEntity::class,
-        DebtEntity::class,
-        SmsPatternEntity::class,
-        RecurringTransactionEntity::class,
-        SavingsGoalEntity::class,
-        ChequeEntity::class
+        com.example.data.local.entity.DebtEntity::class,
+        com.example.data.local.entity.SmsPatternEntity::class
     ],
-    version = 8,
+    version = 6,
     exportSchema = false
 )
 abstract class FinTrackDatabase : RoomDatabase() {
@@ -46,11 +33,8 @@ abstract class FinTrackDatabase : RoomDatabase() {
     abstract fun accountDao(): AccountDao
     abstract fun categoryDao(): CategoryDao
     abstract fun transactionDao(): TransactionDao
-    abstract fun debtDao(): DebtDao
-    abstract fun smsPatternDao(): SmsPatternDao
-    abstract fun recurringDao(): RecurringDao
-    abstract fun savingsGoalDao(): SavingsGoalDao
-    abstract fun chequeDao(): ChequeDao
+    abstract fun debtDao(): com.example.data.local.dao.DebtDao
+    abstract fun smsPatternDao(): com.example.data.local.dao.SmsPatternDao
 
     companion object {
         @Volatile
@@ -70,77 +54,6 @@ abstract class FinTrackDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE categories ADD COLUMN monthlyBudget INTEGER NOT NULL DEFAULT 0")
-            }
-        }
-
-        val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS `recurring_transactions` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `title` TEXT NOT NULL,
-                        `type` TEXT NOT NULL,
-                        `amount` INTEGER NOT NULL,
-                        `accountId` INTEGER NOT NULL,
-                        `toAccountId` INTEGER,
-                        `categoryId` INTEGER,
-                        `period` TEXT NOT NULL,
-                        `startDate` INTEGER NOT NULL,
-                        `nextDueDate` INTEGER NOT NULL,
-                        `lastExecutedDate` INTEGER,
-                        `isInstallment` INTEGER NOT NULL,
-                        `totalInstallments` INTEGER,
-                        `paidInstallments` INTEGER NOT NULL,
-                        `isActive` INTEGER NOT NULL,
-                        `note` TEXT,
-                        `createdAt` INTEGER NOT NULL,
-                        FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
-                        FOREIGN KEY(`toAccountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL,
-                        FOREIGN KEY(`categoryId`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
-                    )
-                """.trimIndent())
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_recurring_transactions_accountId` ON `recurring_transactions` (`accountId`)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_recurring_transactions_toAccountId` ON `recurring_transactions` (`toAccountId`)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_recurring_transactions_categoryId` ON `recurring_transactions` (`categoryId`)")
-
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS `savings_goals` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `title` TEXT NOT NULL,
-                        `targetAmount` INTEGER NOT NULL,
-                        `currentAmount` INTEGER NOT NULL,
-                        `targetDate` INTEGER,
-                        `color` INTEGER NOT NULL,
-                        `icon` TEXT NOT NULL,
-                        `isCompleted` INTEGER NOT NULL,
-                        `note` TEXT,
-                        `createdAt` INTEGER NOT NULL
-                    )
-                """.trimIndent())
-
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS `cheques` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `sayadNumber` TEXT NOT NULL,
-                        `type` TEXT NOT NULL,
-                        `amount` INTEGER NOT NULL,
-                        `dueDate` INTEGER NOT NULL,
-                        `issueDate` INTEGER,
-                        `partyName` TEXT NOT NULL,
-                        `bankName` TEXT NOT NULL,
-                        `accountId` INTEGER,
-                        `status` TEXT NOT NULL,
-                        `note` TEXT,
-                        `clearedDate` INTEGER,
-                        `createdAt` INTEGER NOT NULL
-                    )
-                """.trimIndent())
-            }
-        }
-
         fun getInstance(context: Context): FinTrackDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -148,7 +61,7 @@ abstract class FinTrackDatabase : RoomDatabase() {
                     FinTrackDatabase::class.java,
                     Constants.DATABASE_NAME
                 )
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigration()
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {

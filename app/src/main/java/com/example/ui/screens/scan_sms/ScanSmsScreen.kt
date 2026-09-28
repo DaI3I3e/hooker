@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -89,7 +90,11 @@ fun ScanSmsScreen(
     ) { isGranted ->
         viewModel.updatePermissionState(isGranted)
         if (isGranted) {
-            viewModel.scanSms(context)
+            try {
+                viewModel.scanSms(context.applicationContext)
+            } catch (e: Throwable) {
+                Toast.makeText(context, "خطا در شروع اسکن: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -166,10 +171,14 @@ fun ScanSmsScreen(
 
                             Button(
                                 onClick = {
-                                    if (state.hasPermission) {
-                                        viewModel.scanSms(context)
-                                    } else {
-                                        permissionLauncher.launch(Manifest.permission.READ_SMS)
+                                    try {
+                                        if (state.hasPermission) {
+                                            viewModel.scanSms(context.applicationContext)
+                                        } else {
+                                            permissionLauncher.launch(Manifest.permission.READ_SMS)
+                                        }
+                                    } catch (e: Throwable) {
+                                        Toast.makeText(context, "خطا: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 enabled = !state.isLoading,
@@ -249,10 +258,14 @@ fun ScanSmsScreen(
                             // Scan Action Button
                             Button(
                                 onClick = {
-                                    if (state.hasPermission) {
-                                        viewModel.scanSms(context)
-                                    } else {
-                                        permissionLauncher.launch(Manifest.permission.READ_SMS)
+                                    try {
+                                        if (state.hasPermission) {
+                                            viewModel.scanSms(context.applicationContext)
+                                        } else {
+                                            permissionLauncher.launch(Manifest.permission.READ_SMS)
+                                        }
+                                    } catch (e: Throwable) {
+                                        Toast.makeText(context, "خطا: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 enabled = !state.isLoading,
@@ -336,7 +349,7 @@ fun ScanSmsScreen(
                         }
                     }
 
-                    items(state.scannedList, key = { it.id }) { item ->
+                    itemsIndexed(state.scannedList, key = { index, it -> "${it.id}_$index" }) { _, item ->
                         ScannedSmsCard(
                             item = item,
                             onAddClick = {

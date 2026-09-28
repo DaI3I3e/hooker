@@ -468,15 +468,6 @@ fun NavGraph(
                     onNavigateToTransfer = {
                         navController.navigate(Screen.Transfer.route)
                     },
-                    onNavigateToRecurring = {
-                        navController.navigate(Screen.RecurringTransactions.route)
-                    },
-                    onNavigateToSavingsGoals = {
-                        navController.navigate(Screen.SavingsGoals.route)
-                    },
-                    onNavigateToCheques = {
-                        navController.navigate(Screen.Cheques.route)
-                    },
                     onNavigateToSettings = {
                         navController.navigate(Screen.Settings.route)
                     }
@@ -703,9 +694,6 @@ fun NavGraph(
                     onNavigateToAccounts = { navController.navigate(Screen.Accounts.route) },
                     onNavigateToCategories = { navController.navigate(Screen.Categories.route) },
                     onNavigateToDebts = { navController.navigate(Screen.Debts.route) },
-                    onNavigateToRecurring = { navController.navigate(Screen.RecurringTransactions.route) },
-                    onNavigateToSavingsGoals = { navController.navigate(Screen.SavingsGoals.route) },
-                    onNavigateToCheques = { navController.navigate(Screen.Cheques.route) },
                     onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
                 )
             }
@@ -867,89 +855,6 @@ fun NavGraph(
                     )
                 )
                 SmsPatternLearnerScreen(
-                    viewModel = viewModel,
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-
-            composable(Screen.RecurringTransactions.route) {
-                val viewModel: com.example.ui.screens.recurring.RecurringTransactionsViewModel = viewModel(
-                    factory = com.example.ui.screens.recurring.RecurringTransactionsViewModel.Factory(
-                        recurringRepository = app.appModule.recurringRepository,
-                        transactionRepository = app.appModule.transactionRepository
-                    )
-                )
-                com.example.ui.screens.recurring.RecurringTransactionsScreen(
-                    viewModel = viewModel,
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToAdd = { navController.navigate(Screen.AddRecurringTransaction.route) }
-                )
-            }
-
-            composable(Screen.AddRecurringTransaction.route) {
-                val viewModel: com.example.ui.screens.recurring.AddRecurringTransactionViewModel = viewModel(
-                    factory = com.example.ui.screens.recurring.AddRecurringTransactionViewModel.Factory(
-                        recurringRepository = app.appModule.recurringRepository,
-                        accountRepository = app.appModule.accountRepository,
-                        categoryRepository = app.appModule.categoryRepository
-                    )
-                )
-                com.example.ui.screens.recurring.AddRecurringTransactionScreen(
-                    viewModel = viewModel,
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-
-            composable(Screen.SavingsGoals.route) {
-                val viewModel: com.example.ui.screens.savings.SavingsGoalsViewModel = viewModel(
-                    factory = com.example.ui.screens.savings.SavingsGoalsViewModel.Factory(
-                        savingsGoalRepository = app.appModule.savingsGoalRepository,
-                        accountRepository = app.appModule.accountRepository,
-                        transactionRepository = app.appModule.transactionRepository
-                    )
-                )
-                com.example.ui.screens.savings.SavingsGoalsScreen(
-                    viewModel = viewModel,
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToAdd = { navController.navigate(Screen.AddSavingsGoal.route) }
-                )
-            }
-
-            composable(Screen.AddSavingsGoal.route) {
-                val viewModel: com.example.ui.screens.savings.AddSavingsGoalViewModel = viewModel(
-                    factory = com.example.ui.screens.savings.AddSavingsGoalViewModel.Factory(
-                        savingsGoalRepository = app.appModule.savingsGoalRepository
-                    )
-                )
-                com.example.ui.screens.savings.AddSavingsGoalScreen(
-                    viewModel = viewModel,
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-
-            composable(Screen.Cheques.route) {
-                val viewModel: com.example.ui.screens.cheques.ChequesViewModel = viewModel(
-                    factory = com.example.ui.screens.cheques.ChequesViewModel.Factory(
-                        chequeRepository = app.appModule.chequeRepository,
-                        accountRepository = app.appModule.accountRepository,
-                        transactionRepository = app.appModule.transactionRepository
-                    )
-                )
-                com.example.ui.screens.cheques.ChequesScreen(
-                    viewModel = viewModel,
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToAdd = { navController.navigate(Screen.AddCheque.route) }
-                )
-            }
-
-            composable(Screen.AddCheque.route) {
-                val viewModel: com.example.ui.screens.cheques.AddChequeViewModel = viewModel(
-                    factory = com.example.ui.screens.cheques.AddChequeViewModel.Factory(
-                        chequeRepository = app.appModule.chequeRepository,
-                        accountRepository = app.appModule.accountRepository
-                    )
-                )
-                com.example.ui.screens.cheques.AddChequeScreen(
                     viewModel = viewModel,
                     onNavigateBack = { navController.popBackStack() }
                 )

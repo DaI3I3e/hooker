@@ -71,8 +71,6 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
         transactionDao.insert(transaction)
     }
 
-    suspend fun insert(transaction: TransactionEntity): Long = insertTransaction(transaction)
-
     suspend fun updateTransaction(transaction: TransactionEntity) = withContext(Dispatchers.IO) {
         transactionDao.update(transaction)
     }

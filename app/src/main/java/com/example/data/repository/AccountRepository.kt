@@ -11,8 +11,6 @@ class AccountRepository(private val accountDao: AccountDao) {
     val allAccounts: Flow<List<AccountEntity>> = accountDao.getAll()
     val allAccountsWithBalance: Flow<List<AccountWithBalance>> = accountDao.getAllWithBalance()
 
-    fun getAll(): Flow<List<AccountEntity>> = allAccounts
-
     suspend fun getAllAccountsList(): List<AccountEntity> = withContext(Dispatchers.IO) {
         accountDao.getAllAccountsList()
     }

@@ -48,18 +48,6 @@ class AppModule(private val context: Context) {
         com.example.data.repository.SmsPatternRepository(database.smsPatternDao())
     }
 
-    val recurringRepository: com.example.data.repository.RecurringRepository by lazy {
-        com.example.data.repository.RecurringRepository(database.recurringDao())
-    }
-
-    val savingsGoalRepository: com.example.data.repository.SavingsGoalRepository by lazy {
-        com.example.data.repository.SavingsGoalRepository(database.savingsGoalDao())
-    }
-
-    val chequeRepository: com.example.data.repository.ChequeRepository by lazy {
-        com.example.data.repository.ChequeRepository(database.chequeDao())
-    }
-
     val addTransactionUseCase: AddTransactionUseCase by lazy {
         AddTransactionUseCase(transactionRepository)
     }
