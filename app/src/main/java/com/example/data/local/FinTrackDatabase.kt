@@ -26,9 +26,10 @@ import kotlinx.coroutines.launch
         com.example.data.local.entity.SmsPatternEntity::class,
         com.example.data.local.entity.ChequeEntity::class,
         com.example.data.local.entity.RecurringTransactionEntity::class,
-        com.example.data.local.entity.SavingsGoalEntity::class
+        com.example.data.local.entity.SavingsGoalEntity::class,
+        com.example.data.local.entity.SavingsGoalEntryEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class FinTrackDatabase : RoomDatabase() {
@@ -128,6 +129,60 @@ abstract class FinTrackDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Create savings_goal_entries table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `savings_goal_entries` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `goalId` INTEGER NOT NULL,
+                        `transactionId` INTEGER,
+                        `amount` INTEGER NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `date` INTEGER NOT NULL,
+                        FOREIGN KEY(`goalId`) REFERENCES `savings_goals`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_savings_goal_entries_goalId` ON `savings_goal_entries` (`goalId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_savings_goal_entries_transactionId` ON `savings_goal_entries` (`transactionId`)")
+
+                // 2. Migrate existing currentAmount into initial deposit entries
+                db.execSQL("""
+                    INSERT INTO `savings_goal_entries` (`goalId`, `transactionId`, `amount`, `type`, `date`)
+                    SELECT `id`, NULL, `currentAmount`, 'DEPOSIT', `createdAt`
+                    FROM `savings_goals` WHERE `currentAmount` > 0
+                """.trimIndent())
+
+                // 3. Recreate savings_goals table without currentAmount column
+                db.execSQL("""
+                    CREATE TABLE `savings_goals_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `targetAmount` INTEGER NOT NULL,
+                        `targetDate` INTEGER,
+                        `color` INTEGER NOT NULL,
+                        `icon` TEXT NOT NULL,
+                        `isCompleted` INTEGER NOT NULL,
+                        `note` TEXT,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO `savings_goals_new` (`id`, `title`, `targetAmount`, `targetDate`, `color`, `icon`, `isCompleted`, `note`, `createdAt`)
+                    SELECT `id`, `title`, `targetAmount`, `targetDate`, `color`, `icon`, `isCompleted`, `note`, `createdAt`
+                    FROM `savings_goals`
+                """.trimIndent())
+                db.execSQL("DROP TABLE `savings_goals`")
+                db.execSQL("ALTER TABLE `savings_goals_new` RENAME TO `savings_goals`")
+
+                // 4. Add recurringId and executedForDate to transactions table
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `recurringId` INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `executedForDate` INTEGER DEFAULT NULL")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_recurringId` ON `transactions` (`recurringId`)")
+            }
+        }
+
         fun getInstance(context: Context): FinTrackDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -135,20 +190,7 @@ abstract class FinTrackDatabase : RoomDatabase() {
                     FinTrackDatabase::class.java,
                     Constants.DATABASE_NAME
                 )
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
-                .addCallback(object : RoomDatabase.Callback() {
-                    override fun onCreate(db: SupportSQLiteDatabase) {
-                        super.onCreate(db)
-                        INSTANCE?.let { database ->
-                            CoroutineScope(Dispatchers.IO).launch {
-                                SeedData.insertDefaults(
-                                    accountDao = database.accountDao(),
-                                    categoryDao = database.categoryDao()
-                                )
-                            }
-                        }
-                    }
-                })
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .build()
                 INSTANCE = instance
                 instance

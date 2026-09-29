@@ -1,5 +1,7 @@
 package com.example.data.repository
 
+import androidx.room.withTransaction
+import com.example.data.local.FinTrackDatabase
 import com.example.data.local.dao.RecurringDao
 import com.example.data.local.entity.RecurrencePeriod
 import com.example.data.local.entity.RecurringTransactionEntity
@@ -13,7 +15,8 @@ import kotlinx.coroutines.withContext
 import java.time.ZoneId
 
 class RecurringRepository(
-    private val recurringDao: RecurringDao
+    private val recurringDao: RecurringDao,
+    private val database: FinTrackDatabase
 ) {
     fun getAll(): Flow<List<RecurringWithDetails>> =
         recurringDao.getAll().flowOn(Dispatchers.IO)
@@ -51,45 +54,55 @@ class RecurringRepository(
         recurring: RecurringTransactionEntity,
         transactionRepository: TransactionRepository
     ): Long = withContext(Dispatchers.IO) {
-        val now = System.currentTimeMillis()
-        val installmentPrefix = if (recurring.isInstallment) {
-            val totalStr = recurring.totalInstallments?.toString() ?: "نامشخص"
-            "قسط ${recurring.paidInstallments + 1} از $totalStr: "
-        } else {
-            "تراکنش دوره‌ای: "
+        // Prevent duplicate execution for the same recurring transaction and due date
+        val existingCount = transactionRepository.countByRecurringAndDate(recurring.id, recurring.nextDueDate)
+        if (existingCount > 0) {
+            return@withContext -1L
         }
-        val noteText = (recurring.note ?: "").trim()
-        val finalNote = if (noteText.isNotEmpty()) "$installmentPrefix${recurring.title} - $noteText" else "$installmentPrefix${recurring.title}"
 
-        // Create transaction
-        val tx = TransactionEntity(
-            type = recurring.type,
-            amount = recurring.amount,
-            accountId = recurring.accountId,
-            toAccountId = recurring.toAccountId,
-            categoryId = recurring.categoryId,
-            date = now,
-            note = finalNote
-        )
-        val txId = transactionRepository.insert(tx)
+        database.withTransaction {
+            val now = System.currentTimeMillis()
+            val installmentPrefix = if (recurring.isInstallment) {
+                val totalStr = recurring.totalInstallments?.toString() ?: "نامشخص"
+                "قسط ${recurring.paidInstallments + 1} از $totalStr: "
+            } else {
+                "تراکنش دوره‌ای: "
+            }
+            val noteText = (recurring.note ?: "").trim()
+            val finalNote = if (noteText.isNotEmpty()) "$installmentPrefix${recurring.title} - $noteText" else "$installmentPrefix${recurring.title}"
 
-        // Calculate next state
-        val newPaidCount = recurring.paidInstallments + 1
-        val shouldDeactivate = recurring.isInstallment && 
-                recurring.totalInstallments != null && 
-                newPaidCount >= recurring.totalInstallments
+            // Create transaction with recurringId and executedForDate
+            val tx = TransactionEntity(
+                type = recurring.type,
+                amount = recurring.amount,
+                accountId = recurring.accountId,
+                toAccountId = recurring.toAccountId,
+                categoryId = recurring.categoryId,
+                date = now,
+                note = finalNote,
+                recurringId = recurring.id,
+                executedForDate = recurring.nextDueDate
+            )
+            val txId = transactionRepository.insert(tx)
 
-        val nextDue = calculateNextDueDate(recurring.nextDueDate, recurring.period)
+            // Calculate next state
+            val newPaidCount = recurring.paidInstallments + 1
+            val shouldDeactivate = recurring.isInstallment && 
+                    recurring.totalInstallments != null && 
+                    newPaidCount >= recurring.totalInstallments
 
-        recurringDao.updateExecution(
-            id = recurring.id,
-            nextDueDate = nextDue,
-            lastExecutedDate = now,
-            paidInstallments = newPaidCount,
-            isActive = !shouldDeactivate
-        )
+            val nextDue = calculateNextDueDate(recurring.nextDueDate, recurring.period)
 
-        txId
+            recurringDao.updateExecution(
+                id = recurring.id,
+                nextDueDate = nextDue,
+                lastExecutedDate = now,
+                paidInstallments = newPaidCount,
+                isActive = !shouldDeactivate
+            )
+
+            txId
+        }
     }
 
     companion object {

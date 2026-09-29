@@ -205,10 +205,23 @@ fun ChequesScreen(
                         .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    EmptyState(
-                        title = "هیچ چکی یافت نشد",
-                        icon = Icons.Default.Receipt
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        EmptyState(
+                            title = "هیچ چکی ثبت نشده است",
+                            icon = Icons.Default.Receipt
+                        )
+                        Button(
+                            onClick = onNavigateToAdd,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("ثبت چک جدید")
+                        }
+                    }
                 }
             } else {
                 LazyColumn(

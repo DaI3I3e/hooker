@@ -41,6 +41,7 @@ enum class GoalActionType {
 @Composable
 fun GoalDepositWithdrawDialog(
     goal: SavingsGoalEntity,
+    currentAmount: Long = 0L,
     accounts: List<AccountEntity>,
     actionType: GoalActionType,
     onConfirm: (amount: Long, accountId: Long) -> Unit,
@@ -132,7 +133,7 @@ fun GoalDepositWithdrawDialog(
                         errorMessage = "مبلغ باید بیشتر از صفر باشد"
                         return@Button
                     }
-                    if (!isDeposit && amount > goal.currentAmount) {
+                    if (!isDeposit && currentAmount > 0 && amount > currentAmount) {
                         errorMessage = "موجودی این پس‌انداز کافی نیست"
                         return@Button
                     }

@@ -79,7 +79,7 @@ class ScanSmsViewModel(
                     val scannedResult = mutableListOf<ScannedSmsItem>()
 
                     val uri = Uri.parse("content://sms/inbox")
-                    val projection = arrayOf("_id", "body", "date")
+                    val projection = arrayOf("_id", "address", "body", "date")
                     val startTime = System.currentTimeMillis() - (days.toLong() * 24 * 60 * 60 * 1000)
                     val selection = "date >= ?"
                     val selectionArgs = arrayOf(startTime.toString())
@@ -89,10 +89,12 @@ class ScanSmsViewModel(
                     )
 
                     cursor?.use { c ->
+                        val addressIndex = c.getColumnIndex("address")
                         val bodyIndex = c.getColumnIndex("body")
                         val dateIndex = c.getColumnIndex("date")
 
                         while (c.moveToNext()) {
+                            val sender = if (addressIndex != -1) c.getString(addressIndex) ?: "" else ""
                             val body = if (bodyIndex != -1) c.getString(bodyIndex) else ""
                             val date = if (dateIndex != -1) c.getLong(dateIndex) else System.currentTimeMillis()
 
@@ -114,8 +116,9 @@ class ScanSmsViewModel(
                                 val accountIdent = parsed.accountIdentifier?.trim() ?: ""
                                 val bankName = parsed.bankName?.trim() ?: ""
 
-                                // Calculate hash
-                                val hash = "${amt}_${smsDate}_${accountIdent}"
+                                // Calculate SHA-256 hash (sender + amount + smsDate + normalized text)
+                                val hash = com.example.util.SmsHashUtil.calculateHash(sender, amt, smsDate, body)
+                                val legacyHash = "${amt}_${smsDate}_${accountIdent}"
 
                                 val smsJalali = JalaliDate.fromTimestamp(smsDate)
 
@@ -126,8 +129,8 @@ class ScanSmsViewModel(
                                 val isRegistered = existingTransactions.any { txItem ->
                                     val tx = txItem.transaction
 
-                                    // Exact smsHash match
-                                    if (!tx.smsHash.isNullOrBlank() && tx.smsHash == hash) {
+                                    // Exact smsHash match (supporting both new SHA-256 and legacy hashes)
+                                    if (!tx.smsHash.isNullOrBlank() && (tx.smsHash == hash || tx.smsHash == legacyHash)) {
                                         return@any true
                                     }
 

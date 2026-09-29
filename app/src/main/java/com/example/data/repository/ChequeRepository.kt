@@ -1,5 +1,7 @@
 package com.example.data.repository
 
+import androidx.room.withTransaction
+import com.example.data.local.FinTrackDatabase
 import com.example.data.local.dao.ChequeDao
 import com.example.data.local.entity.ChequeEntity
 import com.example.data.local.entity.ChequeStatus
@@ -13,7 +15,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 
 class ChequeRepository(
-    private val chequeDao: ChequeDao
+    private val chequeDao: ChequeDao,
+    private val database: FinTrackDatabase
 ) {
     fun getAll(): Flow<List<ChequeEntity>> =
         chequeDao.getAll().flowOn(Dispatchers.IO)
@@ -61,32 +64,34 @@ class ChequeRepository(
         accountId: Long,
         transactionRepository: TransactionRepository
     ) = withContext(Dispatchers.IO) {
-        val cheque = chequeDao.getById(chequeId).firstOrNull() ?: return@withContext
-        val now = System.currentTimeMillis()
+        database.withTransaction {
+            val cheque = chequeDao.getById(chequeId).firstOrNull() ?: return@withTransaction
+            val now = System.currentTimeMillis()
 
-        val txType = if (cheque.type == ChequeType.PAYABLE) TransactionType.EXPENSE else TransactionType.INCOME
-        val noteText = if (cheque.type == ChequeType.PAYABLE) {
-            "پاس شدن چک پرداختی: صیاد ${cheque.sayadNumber} به ${cheque.partyName} (${cheque.bankName})"
-        } else {
-            "وصول چک دریافتی: صیاد ${cheque.sayadNumber} از ${cheque.partyName} (${cheque.bankName})"
+            val txType = if (cheque.type == ChequeType.PAYABLE) TransactionType.EXPENSE else TransactionType.INCOME
+            val noteText = if (cheque.type == ChequeType.PAYABLE) {
+                "پاس شدن چک پرداختی: صیاد ${cheque.sayadNumber} به ${cheque.partyName} (${cheque.bankName})"
+            } else {
+                "وصول چک دریافتی: صیاد ${cheque.sayadNumber} از ${cheque.partyName} (${cheque.bankName})"
+            }
+
+            val tx = TransactionEntity(
+                type = txType,
+                amount = cheque.amount,
+                accountId = accountId,
+                toAccountId = null,
+                categoryId = null,
+                date = now,
+                note = noteText
+            )
+            transactionRepository.insert(tx)
+
+            val updatedCheque = cheque.copy(
+                status = ChequeStatus.CLEARED,
+                accountId = accountId,
+                clearedDate = now
+            )
+            chequeDao.update(updatedCheque)
         }
-
-        val tx = TransactionEntity(
-            type = txType,
-            amount = cheque.amount,
-            accountId = accountId,
-            toAccountId = null,
-            categoryId = null,
-            date = now,
-            note = noteText
-        )
-        transactionRepository.insert(tx)
-
-        val updatedCheque = cheque.copy(
-            status = ChequeStatus.CLEARED,
-            accountId = accountId,
-            clearedDate = now
-        )
-        chequeDao.update(updatedCheque)
     }
 }

@@ -9,7 +9,6 @@ data class SavingsGoalEntity(
     val id: Long = 0,
     val title: String,
     val targetAmount: Long,
-    val currentAmount: Long = 0L,
     val targetDate: Long? = null,
     val color: Int = -16738680, // Default green #00897B
     val icon: String = "Savings",

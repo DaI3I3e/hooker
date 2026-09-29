@@ -210,4 +210,7 @@ interface TransactionDao {
         WHERE t.amount = :amount AND t.date >= :dayStart AND t.date <= :dayEnd
     """)
     suspend fun findMatchingTransactions(amount: Long, dayStart: Long, dayEnd: Long): List<TransactionWithDetails>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE recurringId = :recurringId AND executedForDate = :executedForDate")
+    suspend fun countByRecurringAndDate(recurringId: Long, executedForDate: Long): Int
 }

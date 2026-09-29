@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.entity.AccountEntity
 import com.example.data.local.entity.SavingsGoalEntity
+import com.example.data.local.relation.SavingsGoalWithDetails
 import com.example.data.repository.AccountRepository
 import com.example.data.repository.SavingsGoalRepository
 import com.example.data.repository.TransactionRepository
@@ -12,12 +13,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class SavingsGoalsUiState(
-    val goals: List<SavingsGoalEntity> = emptyList(),
+    val goals: List<SavingsGoalWithDetails> = emptyList(),
     val accounts: List<AccountEntity> = emptyList(),
     val totalTargetAmount: Long = 0L,
     val totalCurrentSaved: Long = 0L,
@@ -41,7 +41,7 @@ class SavingsGoalsViewModel(
         accountRepository.getAll(),
         _successMessage
     ) { goalsList, accountsList, message ->
-        val totalTarget = goalsList.sumOf { it.targetAmount }
+        val totalTarget = goalsList.sumOf { it.goal.targetAmount }
         val totalSaved = goalsList.sumOf { it.currentAmount }
         val progress = if (totalTarget > 0) (totalSaved.toFloat() / totalTarget).coerceIn(0f, 1f) else 0f
         val active = goalsList.count { !it.isCompleted }

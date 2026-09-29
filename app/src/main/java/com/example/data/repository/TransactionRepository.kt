@@ -94,4 +94,8 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
     suspend fun findMatchingTransactions(amount: Long, dayStart: Long, dayEnd: Long): List<TransactionWithDetails> = withContext(Dispatchers.IO) {
         transactionDao.findMatchingTransactions(amount, dayStart, dayEnd)
     }
+
+    suspend fun countByRecurringAndDate(recurringId: Long, executedForDate: Long): Int = withContext(Dispatchers.IO) {
+        transactionDao.countByRecurringAndDate(recurringId, executedForDate)
+    }
 }

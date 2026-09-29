@@ -53,7 +53,7 @@ class AppModule(private val context: Context) {
     }
 
     val chequeRepository: com.example.data.repository.ChequeRepository by lazy {
-        com.example.data.repository.ChequeRepository(database.chequeDao())
+        com.example.data.repository.ChequeRepository(database.chequeDao(), database)
     }
 
     val recurringDao: com.example.data.local.dao.RecurringDao by lazy {
@@ -61,7 +61,7 @@ class AppModule(private val context: Context) {
     }
 
     val recurringRepository: com.example.data.repository.RecurringRepository by lazy {
-        com.example.data.repository.RecurringRepository(database.recurringDao())
+        com.example.data.repository.RecurringRepository(database.recurringDao(), database)
     }
 
     val savingsGoalDao: com.example.data.local.dao.SavingsGoalDao by lazy {
@@ -69,7 +69,7 @@ class AppModule(private val context: Context) {
     }
 
     val savingsGoalRepository: com.example.data.repository.SavingsGoalRepository by lazy {
-        com.example.data.repository.SavingsGoalRepository(database.savingsGoalDao())
+        com.example.data.repository.SavingsGoalRepository(database.savingsGoalDao(), database)
     }
 
     val addTransactionUseCase: AddTransactionUseCase by lazy {

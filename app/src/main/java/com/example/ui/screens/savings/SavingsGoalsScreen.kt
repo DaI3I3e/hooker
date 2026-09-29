@@ -1,6 +1,8 @@
 package com.example.ui.screens.savings
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -31,6 +34,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -55,7 +59,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.local.entity.SavingsEntryType
 import com.example.data.local.entity.SavingsGoalEntity
+import com.example.data.local.relation.SavingsGoalWithDetails
 import com.example.ui.components.EmptyState
 import com.example.ui.theme.ExpenseColor
 import com.example.ui.theme.IncomeColor
@@ -72,7 +78,7 @@ fun SavingsGoalsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    var activeGoalForAction by remember { mutableStateOf<Pair<SavingsGoalEntity, GoalActionType>?>(null) }
+    var activeGoalForAction by remember { mutableStateOf<Pair<SavingsGoalWithDetails, GoalActionType>?>(null) }
     var goalToDelete by remember { mutableStateOf<SavingsGoalEntity?>(null) }
 
     LaunchedEffect(state.successMessage) {
@@ -204,10 +210,23 @@ fun SavingsGoalsScreen(
                         .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    EmptyState(
-                        title = "هنوز هدف پس‌اندازی ثبت نکرده‌اید",
-                        icon = Icons.Default.Savings
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        EmptyState(
+                            title = "هنوز هدف پس‌اندازی ثبت نکرده‌اید",
+                            icon = Icons.Default.Savings
+                        )
+                        Button(
+                            onClick = onNavigateToAdd,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("افزودن اولین هدف پس‌انداز")
+                        }
+                    }
                 }
             } else {
                 LazyColumn(
@@ -215,12 +234,12 @@ fun SavingsGoalsScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    items(state.goals, key = { it.id }) { goal ->
+                    items(state.goals, key = { it.goal.id }) { item ->
                         SavingsGoalCard(
-                            goal = goal,
-                            onDeposit = { activeGoalForAction = Pair(goal, GoalActionType.DEPOSIT) },
-                            onWithdraw = { activeGoalForAction = Pair(goal, GoalActionType.WITHDRAW) },
-                            onDelete = { goalToDelete = goal }
+                            item = item,
+                            onDeposit = { activeGoalForAction = Pair(item, GoalActionType.DEPOSIT) },
+                            onWithdraw = { activeGoalForAction = Pair(item, GoalActionType.WITHDRAW) },
+                            onDelete = { goalToDelete = item.goal }
                         )
                     }
                 }
@@ -229,16 +248,17 @@ fun SavingsGoalsScreen(
     }
 
     // Deposit / Withdraw Dialog
-    activeGoalForAction?.let { (goal, actionType) ->
+    activeGoalForAction?.let { (item, actionType) ->
         GoalDepositWithdrawDialog(
-            goal = goal,
+            goal = item.goal,
+            currentAmount = item.currentAmount,
             accounts = state.accounts,
             actionType = actionType,
             onConfirm = { amount, accountId ->
                 if (actionType == GoalActionType.DEPOSIT) {
-                    viewModel.deposit(goal.id, amount, accountId)
+                    viewModel.deposit(item.goal.id, amount, accountId)
                 } else {
-                    viewModel.withdraw(goal.id, amount, accountId)
+                    viewModel.withdraw(item.goal.id, amount, accountId)
                 }
                 activeGoalForAction = null
             },
@@ -274,23 +294,28 @@ fun SavingsGoalsScreen(
 
 @Composable
 fun SavingsGoalCard(
-    goal: SavingsGoalEntity,
+    item: SavingsGoalWithDetails,
     onDeposit: () -> Unit,
     onWithdraw: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val goal = item.goal
+    val currentAmount = item.currentAmount
+    val isCompleted = item.isCompleted
+    var showHistory by remember { mutableStateOf(false) }
+
     val progress = if (goal.targetAmount > 0) {
-        (goal.currentAmount.toFloat() / goal.targetAmount).coerceIn(0f, 1f)
+        (currentAmount.toFloat() / goal.targetAmount).coerceIn(0f, 1f)
     } else 0f
-    val remaining = (goal.targetAmount - goal.currentAmount).coerceAtLeast(0L)
+    val remaining = (goal.targetAmount - currentAmount).coerceAtLeast(0L)
     val accentColor = Color(goal.color)
 
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (goal.isCompleted) IncomeColor.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface
+            containerColor = if (isCompleted) IncomeColor.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -371,10 +396,10 @@ fun SavingsGoalCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = AmountFormatter.format(goal.currentAmount),
+                        text = AmountFormatter.format(currentAmount),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (goal.isCompleted) IncomeColor else MaterialTheme.colorScheme.primary
+                        color = if (isCompleted) IncomeColor else MaterialTheme.colorScheme.primary
                     )
                 }
 
@@ -401,7 +426,7 @@ fun SavingsGoalCard(
                     .fillMaxWidth()
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp)),
-                color = if (goal.isCompleted) IncomeColor else accentColor,
+                color = if (isCompleted) IncomeColor else accentColor,
                 trackColor = accentColor.copy(alpha = 0.15f)
             )
 
@@ -412,7 +437,7 @@ fun SavingsGoalCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                if (goal.isCompleted) {
+                if (isCompleted) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
@@ -440,7 +465,7 @@ fun SavingsGoalCard(
                     text = "${(progress * 100).toInt()}%",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (goal.isCompleted) IncomeColor else accentColor
+                    color = if (isCompleted) IncomeColor else accentColor
                 )
             }
 
@@ -462,13 +487,84 @@ fun SavingsGoalCard(
                     Text("واریز به پس‌انداز", fontWeight = FontWeight.Bold)
                 }
 
-                if (goal.currentAmount > 0) {
+                if (currentAmount > 0) {
                     OutlinedButton(
                         onClick = onWithdraw,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Text("برداشت از پس‌انداز", color = ExpenseColor, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            // History toggle button
+            if (item.entries.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showHistory = !showHistory }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (showHistory) "بستن تاریخچه واریز و برداشت" else "مشاهده تاریخچه واریز و برداشت (${item.entries.size})",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                AnimatedVisibility(visible = showHistory) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        item.entries.sortedByDescending { it.date }.forEach { entry ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = if (entry.type == SavingsEntryType.DEPOSIT) "واریز" else "برداشت",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (entry.type == SavingsEntryType.DEPOSIT) IncomeColor else ExpenseColor
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = DateFormatter.formatJalali(entry.date),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Text(
+                                    text = (if (entry.type == SavingsEntryType.DEPOSIT) "+ " else "- ") + AmountFormatter.format(entry.amount),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (entry.type == SavingsEntryType.DEPOSIT) IncomeColor else ExpenseColor
+                                )
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        }
                     }
                 }
             }

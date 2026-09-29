@@ -51,14 +51,13 @@ class AddSavingsGoalViewModel(
             val goal = SavingsGoalEntity(
                 title = state.title.trim(),
                 targetAmount = state.targetAmount,
-                currentAmount = state.initialAmount,
                 targetDate = state.targetDate,
                 color = state.selectedColor,
                 icon = "Savings",
                 isCompleted = state.initialAmount >= state.targetAmount,
                 note = state.note.ifBlank { null }
             )
-            savingsGoalRepository.insert(goal)
+            savingsGoalRepository.insertGoal(goal, state.initialAmount)
             _uiState.update { it.copy(isSaved = true) }
         }
     }

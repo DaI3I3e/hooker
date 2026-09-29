@@ -34,7 +34,8 @@ enum class TransactionType {
     indices = [
         Index("accountId"),
         Index("toAccountId"),
-        Index("categoryId")
+        Index("categoryId"),
+        Index("recurringId")
     ]
 )
 data class TransactionEntity(
@@ -48,5 +49,7 @@ data class TransactionEntity(
     val date: Long,
     val note: String? = null,
     val smsHash: String? = null,
+    val recurringId: Long? = null,
+    val executedForDate: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 )

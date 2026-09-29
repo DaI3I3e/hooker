@@ -83,6 +83,7 @@ fun RecurringTransactionsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var itemToDelete by remember { mutableStateOf<RecurringWithDetails?>(null) }
     var itemToExecute by remember { mutableStateOf<RecurringWithDetails?>(null) }
+    var isExecutingNow by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.successMessage) {
         state.successMessage?.let {
@@ -227,10 +228,23 @@ fun RecurringTransactionsScreen(
                         .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    EmptyState(
-                        title = "هیچ موردی یافت نشد",
-                        icon = Icons.Default.Repeat
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        EmptyState(
+                            title = "هیچ موردی ثبت نشده است",
+                            icon = Icons.Default.Repeat
+                        )
+                        Button(
+                            onClick = onNavigateToAdd,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("ثبت تراکنش دوره‌ای / قسط")
+                        }
+                    }
                 }
             } else {
                 LazyColumn(
@@ -255,7 +269,9 @@ fun RecurringTransactionsScreen(
     itemToExecute?.let { item ->
         val isInst = item.recurring.isInstallment
         AlertDialog(
-            onDismissRequest = { itemToExecute = null },
+            onDismissRequest = { 
+                if (!isExecutingNow) itemToExecute = null 
+            },
             title = {
                 Text(
                     text = if (isInst) "ثبت پرداخت قسط" else "ثبت تراکنش دوره‌ای",
@@ -283,16 +299,24 @@ fun RecurringTransactionsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.executeNow(item)
-                        itemToExecute = null
+                        if (!isExecutingNow) {
+                            isExecutingNow = true
+                            viewModel.executeNow(item)
+                            itemToExecute = null
+                            isExecutingNow = false
+                        }
                     },
+                    enabled = !isExecutingNow,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Text("تایید و ثبت")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { itemToExecute = null }) {
+                TextButton(
+                    onClick = { itemToExecute = null },
+                    enabled = !isExecutingNow
+                ) {
                     Text("انصراف")
                 }
             }
