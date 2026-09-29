@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
@@ -403,11 +404,18 @@ fun TransactionsScreen(
                             items(transactions, key = { it.transaction.id }) { item ->
                                 val dismissState = rememberSwipeToDismissBoxState(
                                     confirmValueChange = { value ->
-                                        if (value == SwipeToDismissBoxValue.EndToStart || value == SwipeToDismissBoxValue.StartToEnd) {
-                                            transactionToDelete = item.transaction
-                                            false // return false so item stays until confirmed
-                                        } else {
-                                            false
+                                        when (value) {
+                                            SwipeToDismissBoxValue.EndToStart -> {
+                                                // Swipe to Delete (drag toward start)
+                                                transactionToDelete = item.transaction
+                                                false // return false so item returns to settled while dialog confirms
+                                            }
+                                            SwipeToDismissBoxValue.StartToEnd -> {
+                                                // Swipe to Edit (drag toward end)
+                                                onNavigateToEditTransaction(item.transaction.id)
+                                                false // return false so item returns to settled while opening edit screen
+                                            }
+                                            SwipeToDismissBoxValue.Settled -> false
                                         }
                                     }
                                 )
@@ -415,21 +423,42 @@ fun TransactionsScreen(
                                 SwipeToDismissBox(
                                     state = dismissState,
                                     backgroundContent = {
-                                        val isDismissing = dismissState.targetValue != SwipeToDismissBoxValue.Settled
+                                        val direction = dismissState.dismissDirection
+                                        val bgColor = when (direction) {
+                                            SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
+                                            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
+                                            else -> Color.Transparent
+                                        }
+                                        val iconAlignment = when (direction) {
+                                            SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+                                            SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                                            else -> Alignment.Center
+                                        }
+
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
                                                 .clip(RoundedCornerShape(if (state.isFullscreen) 10.dp else 16.dp))
-                                                .background(if (isDismissing) MaterialTheme.colorScheme.errorContainer else Color.Transparent)
+                                                .background(bgColor)
                                                 .padding(horizontal = 20.dp),
-                                            contentAlignment = Alignment.CenterEnd
+                                            contentAlignment = iconAlignment
                                         ) {
-                                            if (isDismissing) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Delete,
-                                                    contentDescription = "حذف",
-                                                    tint = MaterialTheme.colorScheme.onErrorContainer
-                                                )
+                                            when (direction) {
+                                                SwipeToDismissBoxValue.EndToStart -> {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Delete,
+                                                        contentDescription = "حذف",
+                                                        tint = MaterialTheme.colorScheme.onErrorContainer
+                                                    )
+                                                }
+                                                SwipeToDismissBoxValue.StartToEnd -> {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Edit,
+                                                        contentDescription = "ویرایش",
+                                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                                    )
+                                                }
+                                                else -> {}
                                             }
                                         }
                                     },

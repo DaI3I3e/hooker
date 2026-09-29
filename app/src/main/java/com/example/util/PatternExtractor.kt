@@ -42,14 +42,15 @@ object PatternExtractor {
         val tokens = mutableListOf<String>()
 
         // Check if line is Key:Value (e.g. برداشت:680,000- or حساب:04007 or مانده:702,045,020)
-        // Ensure colon is not part of a pure time (like 18:20)
+        // Ensure colon is not part of a time (like 18:20, 21:05, 0706-21:05)
         val colonIndex = line.indexOf(':')
         if (colonIndex > 0 && colonIndex < line.length - 1) {
             val prefix = line.substring(0, colonIndex).trim()
             val suffix = line.substring(colonIndex + 1).trim()
-            val isPureTimePrefix = prefix.matches(Regex("""[\d۰-۹٠-٩]{1,2}""")) && suffix.matches(Regex("""[\d۰-۹٠-٩]{2}(?::[\d۰-۹٠-٩]{2})?.*"""))
+            val isTimeColon = prefix.matches(Regex(""".*[\d۰-۹٠-٩]{1,2}$""")) && suffix.matches(Regex("""^[\d۰-۹٠-٩]{2}.*"""))
+            val hasLettersInPrefix = prefix.any { it.isLetter() }
 
-            if (!isPureTimePrefix) {
+            if (!isTimeColon && hasLettersInPrefix) {
                 // Key part
                 tokens.addAll(tokenizeSegment(prefix))
                 // Value part
@@ -61,6 +62,16 @@ object PatternExtractor {
         // Otherwise tokenize the entire line segment
         tokens.addAll(tokenizeSegment(line))
         return tokens
+    }
+
+    private fun toEnglishDigits(input: String): String {
+        val persianDigits = charArrayOf('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹')
+        val arabicDigits = charArrayOf('٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩')
+        var result = input
+        for (i in 0..9) {
+            result = result.replace(persianDigits[i], ('0' + i)).replace(arabicDigits[i], ('0' + i))
+        }
+        return result
     }
 
     private fun tokenizeSegment(segment: String): List<String> {
@@ -96,16 +107,27 @@ object PatternExtractor {
                 if (workingChunk.isEmpty()) continue
             }
 
-            // Pattern 1: MMDD-HH:MM or MMDD_HH:MM (e.g. 0525-17:28)
-            val p1 = Regex("""([\d۰-۹٠-٩]{2})([\d۰-۹٠-٩]{2})[_\-]([\d۰-۹٠-٩]{2}):([\d۰-۹٠-٩]{2})""")
-            val m1 = p1.find(workingChunk)
-            if (m1 != null) {
-                tokens.add(m1.groupValues[1])
-                tokens.add(m1.groupValues[2])
-                tokens.add(m1.groupValues[3])
-                tokens.add(m1.groupValues[4])
-                workingChunk = workingChunk.removeRange(m1.range).trim()
-                if (workingChunk.isEmpty()) continue
+            // Priority Pattern: MMDD-HH:MM or MMDD_HH:MM (e.g. 0706-21:05 or 0525-17:28)
+            // Group 1 = Month (01-12), Group 2 = Day (01-31), Group 3 = Hour (00-23), Group 4 = Minute (00-59)
+            val pMmDdTime = Regex("""([\d۰-۹٠-٩]{2})([\d۰-۹٠-٩]{2})[_\-]([\d۰-۹٠-٩]{2}):([\d۰-۹٠-٩]{2})""")
+            val mMmDdTime = pMmDdTime.find(workingChunk)
+            if (mMmDdTime != null) {
+                val rawM = mMmDdTime.groupValues[1]
+                val rawD = mMmDdTime.groupValues[2]
+                val rawH = mMmDdTime.groupValues[3]
+                val rawMin = mMmDdTime.groupValues[4]
+                val mInt = toEnglishDigits(rawM).toIntOrNull() ?: -1
+                val dInt = toEnglishDigits(rawD).toIntOrNull() ?: -1
+                val hInt = toEnglishDigits(rawH).toIntOrNull() ?: -1
+                val minInt = toEnglishDigits(rawMin).toIntOrNull() ?: -1
+                if (mInt in 1..12 && dInt in 1..31 && hInt in 0..23 && minInt in 0..59) {
+                    tokens.add(rawM)
+                    tokens.add(rawD)
+                    tokens.add(rawH)
+                    tokens.add(rawMin)
+                    workingChunk = workingChunk.removeRange(mMmDdTime.range).trim()
+                    if (workingChunk.isEmpty()) continue
+                }
             }
 
             // Pattern 5: YYYY/MM/DD or YY/MM/DD (e.g. 1405/03/01)
@@ -138,6 +160,21 @@ object PatternExtractor {
                 tokens.add(m7.groupValues[2])
                 workingChunk = workingChunk.removeRange(m7.range).trim()
                 if (workingChunk.isEmpty()) continue
+            }
+
+            // Pattern 8: Standalone MMDD (e.g. "0706" in line with month 01-12 and day 01-31)
+            val pMmDdOnly = Regex("""^([\d۰-۹٠-٩]{2})([\d۰-۹٠-٩]{2})$""")
+            val mMmDdOnly = pMmDdOnly.find(workingChunk)
+            if (mMmDdOnly != null) {
+                val rawM = mMmDdOnly.groupValues[1]
+                val rawD = mMmDdOnly.groupValues[2]
+                val mInt = toEnglishDigits(rawM).toIntOrNull() ?: -1
+                val dInt = toEnglishDigits(rawD).toIntOrNull() ?: -1
+                if (mInt in 1..12 && dInt in 1..31 && (chunks.size == 1 || segment.contains("تاریخ") || rawM.startsWith("0") || rawM.startsWith("۰") || rawM.startsWith("٠"))) {
+                    tokens.add(rawM)
+                    tokens.add(rawD)
+                    continue
+                }
             }
 
             // Signed amount with leading sign: "-6,500,000" or "+250,000,000"

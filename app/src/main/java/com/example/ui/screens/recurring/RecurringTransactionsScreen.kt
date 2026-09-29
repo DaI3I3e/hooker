@@ -92,6 +92,13 @@ fun RecurringTransactionsScreen(
         }
     }
 
+    LaunchedEffect(state.errorMessage) {
+        state.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearErrorMessage()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -301,14 +308,30 @@ fun RecurringTransactionsScreen(
                     onClick = {
                         if (!isExecutingNow) {
                             isExecutingNow = true
-                            viewModel.executeNow(item)
-                            itemToExecute = null
-                            isExecutingNow = false
+                            viewModel.executeNow(
+                                item = item,
+                                onSuccess = {
+                                    isExecutingNow = false
+                                    itemToExecute = null
+                                },
+                                onError = {
+                                    isExecutingNow = false
+                                    itemToExecute = null
+                                }
+                            )
                         }
                     },
                     enabled = !isExecutingNow,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
+                    if (isExecutingNow) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
                     Text("تایید و ثبت")
                 }
             },

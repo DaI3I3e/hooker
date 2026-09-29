@@ -33,6 +33,12 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE id = :id")
     fun getById(id: Long): Flow<AccountEntity?>
 
+    @Query("SELECT * FROM accounts WHERE id = :id")
+    suspend fun getAccountById(id: Long): AccountEntity?
+
+    @Query("SELECT * FROM accounts LIMIT 1")
+    suspend fun getFirstAccount(): AccountEntity?
+
     @Query("""
         SELECT 
           a.*,

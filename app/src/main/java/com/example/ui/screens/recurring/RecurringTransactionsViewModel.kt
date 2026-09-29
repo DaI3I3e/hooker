@@ -28,7 +28,8 @@ data class RecurringUiState(
     val dueCount: Int = 0,
     val totalMonthlyCommitment: Long = 0L,
     val isLoading: Boolean = false,
-    val successMessage: String? = null
+    val successMessage: String? = null,
+    val errorMessage: String? = null
 )
 
 class RecurringTransactionsViewModel(
@@ -38,12 +39,14 @@ class RecurringTransactionsViewModel(
 
     private val _activeTab = MutableStateFlow(RecurringFilterTab.ALL)
     private val _successMessage = MutableStateFlow<String?>(null)
+    private val _errorMessage = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<RecurringUiState> = combine(
         recurringRepository.getAll(),
         _activeTab,
-        _successMessage
-    ) { allItems, tab, message ->
+        _successMessage,
+        _errorMessage
+    ) { allItems, tab, message, errorMsg ->
         val now = System.currentTimeMillis()
         val activeItems = allItems.filter { it.recurring.isActive }
         val dueItems = activeItems.filter { it.recurring.nextDueDate <= now }
@@ -73,7 +76,8 @@ class RecurringTransactionsViewModel(
             totalActiveCount = activeItems.size,
             dueCount = dueItems.size,
             totalMonthlyCommitment = monthlyCommitment,
-            successMessage = message
+            successMessage = message,
+            errorMessage = errorMsg
         )
     }.stateIn(
         scope = viewModelScope,
@@ -85,34 +89,66 @@ class RecurringTransactionsViewModel(
         _activeTab.value = tab
     }
 
-    fun executeNow(item: RecurringWithDetails) {
+    fun executeNow(
+        item: RecurringWithDetails,
+        onSuccess: () -> Unit = {},
+        onError: () -> Unit = {}
+    ) {
         viewModelScope.launch {
-            val title = item.recurring.title
-            recurringRepository.executeRecurring(item.recurring, transactionRepository)
-            _successMessage.value = if (item.recurring.isInstallment) {
-                "قسط «$title» با موفقیت در تراکنش‌ها ثبت شد"
-            } else {
-                "تراکنش دوره‌ای «$title» با موفقیت ثبت شد"
+            try {
+                val title = item.recurring.title
+                val result = recurringRepository.executeRecurring(item.recurring, transactionRepository)
+                if (result > 0) {
+                    _successMessage.value = if (item.recurring.isInstallment) {
+                        "قسط «$title» با موفقیت در تراکنش‌ها ثبت شد"
+                    } else {
+                        "تراکنش دوره‌ای «$title» با موفقیت ثبت شد"
+                    }
+                    onSuccess()
+                } else if (result == -1L) {
+                    _errorMessage.value = "این مورد قبلاً برای سررسید جاری ثبت شده است"
+                    onSuccess()
+                } else {
+                    _errorMessage.value = "خطا در ثبت تراکنش"
+                    onError()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("RecurringVM", "Failed to execute recurring item ${item.recurring.id}: ${item.recurring.title}", e)
+                _errorMessage.value = "خطا در ثبت تراکنش"
+                onError()
             }
         }
     }
 
     fun toggleActive(item: RecurringWithDetails) {
         viewModelScope.launch {
-            val updated = item.recurring.copy(isActive = !item.recurring.isActive)
-            recurringRepository.update(updated)
+            try {
+                val updated = item.recurring.copy(isActive = !item.recurring.isActive)
+                recurringRepository.update(updated)
+            } catch (e: Exception) {
+                android.util.Log.e("RecurringVM", "Failed to toggle active for ${item.recurring.id}", e)
+            }
         }
     }
 
     fun delete(item: RecurringWithDetails) {
         viewModelScope.launch {
-            recurringRepository.delete(item.recurring)
-            _successMessage.value = "مورد انتخابی با موفقیت حذف شد"
+            try {
+                recurringRepository.delete(item.recurring)
+                _successMessage.value = "مورد انتخابی با موفقیت حذف شد"
+            } catch (e: Exception) {
+                android.util.Log.e("RecurringVM", "Failed to delete item ${item.recurring.id}", e)
+                _errorMessage.value = "خطا در حذف مورد"
+            }
         }
     }
 
     fun clearMessage() {
         _successMessage.value = null
+    }
+
+    fun clearErrorMessage() {
+        _errorMessage.value = null
     }
 
     class Factory(

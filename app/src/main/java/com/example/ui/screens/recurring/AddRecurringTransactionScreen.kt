@@ -182,11 +182,18 @@ fun AddRecurringTransactionScreen(
 
             // Category Picker (if not transfer)
             if (state.type != TransactionType.TRANSFER) {
+                Text(
+                    text = "دسته‌بندی",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
                 CategoryPicker(
-                    categories = state.categories.filter { it.type.name == state.type.name },
+                    categories = state.categories.filter { it.type.name == state.type.name || it.type.name == "BOTH" },
                     selectedCategoryId = state.selectedCategoryId,
                     onCategorySelected = { viewModel.setCategory(it.id) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
                 )
             }
 

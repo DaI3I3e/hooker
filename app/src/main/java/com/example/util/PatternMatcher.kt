@@ -23,12 +23,14 @@ object PatternMatcher {
         for (pattern in patterns) {
             if (!pattern.isActive) continue
 
-            val savedFields: List<ExtractedField> = try {
+            val rawSavedFields: List<ExtractedField> = try {
                 gson.fromJson(pattern.extractedFields, fieldListType)
             } catch (e: Exception) {
                 emptyList()
             }
-            if (savedFields.isEmpty()) continue
+            if (rawSavedFields.isEmpty()) continue
+
+            val savedFields = normalizeSavedFields(rawSavedFields)
 
             // 1. Structure check: token count must match closely (at most difference of 1)
             if (Math.abs(savedFields.size - currentTokens.size) > 1) continue
@@ -158,6 +160,81 @@ object PatternMatcher {
         return null
     }
 
+    fun normalizeSavedFields(savedFields: List<ExtractedField>): List<ExtractedField> {
+        val result = mutableListOf<ExtractedField>()
+        var i = 0
+        while (i < savedFields.size) {
+            val field = savedFields[i]
+            val text = field.text.trim()
+
+            // 1. Full combined MMDD-HH:MM or MMDD_HH:MM (e.g. 0706-21:05)
+            val fullMatch = Regex("""^([\d۰-۹٠-٩]{2})([\d۰-۹٠-٩]{2})[_\-]([\d۰-۹٠-٩]{2}):([\d۰-۹٠-٩]{2})$""").find(text)
+            if (fullMatch != null) {
+                val m = fullMatch.groupValues[1]
+                val d = fullMatch.groupValues[2]
+                val h = fullMatch.groupValues[3]
+                val min = fullMatch.groupValues[4]
+                val mInt = convertToEnglish(m).toIntOrNull() ?: -1
+                val dInt = convertToEnglish(d).toIntOrNull() ?: -1
+                val hInt = convertToEnglish(h).toIntOrNull() ?: -1
+                val minInt = convertToEnglish(min).toIntOrNull() ?: -1
+                if (mInt in 1..12 && dInt in 1..31 && hInt in 0..23 && minInt in 0..59) {
+                    result.add(ExtractedField(m, field.lineIndex, FieldType.DATE_MONTH))
+                    result.add(ExtractedField(d, field.lineIndex, FieldType.DATE_DAY))
+                    result.add(ExtractedField(h, field.lineIndex, FieldType.TIME_HOUR))
+                    result.add(ExtractedField(min, field.lineIndex, FieldType.TIME_MINUTE))
+                    i++
+                    continue
+                }
+            }
+
+            // 2. Partial bug where previous PatternExtractor split around colon:
+            // Field i was "0706-21" and field i+1 was "05"
+            val partialBugMatch = Regex("""^([\d۰-۹٠-٩]{2})([\d۰-۹٠-٩]{2})[_\-]([\d۰-۹٠-٩]{2})$""").find(text)
+            if (partialBugMatch != null && i + 1 < savedFields.size) {
+                val nextField = savedFields[i + 1]
+                val nextText = nextField.text.trim()
+                if (nextText.matches(Regex("""^[\d۰-۹٠-٩]{2}$"""))) {
+                    val m = partialBugMatch.groupValues[1]
+                    val d = partialBugMatch.groupValues[2]
+                    val h = partialBugMatch.groupValues[3]
+                    val min = nextText
+                    val mInt = convertToEnglish(m).toIntOrNull() ?: -1
+                    val dInt = convertToEnglish(d).toIntOrNull() ?: -1
+                    val hInt = convertToEnglish(h).toIntOrNull() ?: -1
+                    val minInt = convertToEnglish(min).toIntOrNull() ?: -1
+                    if (mInt in 1..12 && dInt in 1..31 && hInt in 0..23 && minInt in 0..59) {
+                        result.add(ExtractedField(m, field.lineIndex, FieldType.DATE_MONTH))
+                        result.add(ExtractedField(d, field.lineIndex, FieldType.DATE_DAY))
+                        result.add(ExtractedField(h, field.lineIndex, FieldType.TIME_HOUR))
+                        result.add(ExtractedField(min, nextField.lineIndex, FieldType.TIME_MINUTE))
+                        i += 2
+                        continue
+                    }
+                }
+            }
+
+            // 3. Standalone MMDD (e.g. "0706")
+            val mmDdMatch = Regex("""^([\d۰-۹٠-٩]{2})([\d۰-۹٠-٩]{2})$""").find(text)
+            if (mmDdMatch != null && (field.fieldType == FieldType.DATE_MONTH || field.fieldType == FieldType.DATE_DAY || field.fieldType == FieldType.IGNORE)) {
+                val m = mmDdMatch.groupValues[1]
+                val d = mmDdMatch.groupValues[2]
+                val mInt = convertToEnglish(m).toIntOrNull() ?: -1
+                val dInt = convertToEnglish(d).toIntOrNull() ?: -1
+                if (mInt in 1..12 && dInt in 1..31 && (text.startsWith("0") || text.startsWith("۰") || text.startsWith("٠"))) {
+                    result.add(ExtractedField(m, field.lineIndex, FieldType.DATE_MONTH))
+                    result.add(ExtractedField(d, field.lineIndex, FieldType.DATE_DAY))
+                    i++
+                    continue
+                }
+            }
+
+            result.add(field)
+            i++
+        }
+        return result
+    }
+
     private fun convertToEnglish(input: String): String {
         val persianDigits = charArrayOf('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹')
         val arabicDigits = charArrayOf('٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩')
@@ -239,11 +316,15 @@ object PatternMatcher {
                             jMonth = monthDayMatch.groupValues[1].toInt()
                             jDay = monthDayMatch.groupValues[2].toInt()
                         } else {
-                            // 4. Raw MMDD (e.g. 0525-17:28)
+                            // 4. Raw MMDD (e.g. 0525-17:28 or 0706-21:05)
                             val rawMmDdMatch = Regex("""(\d{2})(\d{2})(?:[_\-]\d{1,2}:\d{2})?""").find(eng)
                             if (rawMmDdMatch != null) {
-                                jMonth = rawMmDdMatch.groupValues[1].toInt()
-                                jDay = rawMmDdMatch.groupValues[2].toInt()
+                                val mCandidate = rawMmDdMatch.groupValues[1].toInt()
+                                val dCandidate = rawMmDdMatch.groupValues[2].toInt()
+                                if (mCandidate in 1..12 && dCandidate in 1..31) {
+                                    jMonth = mCandidate
+                                    jDay = dCandidate
+                                }
                             }
                         }
                     }

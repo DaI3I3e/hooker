@@ -41,11 +41,16 @@ fun CategoryPicker(
     categories: List<CategoryEntity>,
     selectedCategoryId: Long?,
     onCategorySelected: (CategoryEntity) -> Unit,
-    modifier: Modifier = Modifier.height(200.dp)
+    modifier: Modifier = Modifier
 ) {
+    val effectiveModifier = Modifier
+        .fillMaxWidth()
+        .height(200.dp)
+        .then(modifier)
+
     if (categories.isEmpty()) {
         Box(
-            modifier = modifier.fillMaxWidth(),
+            modifier = effectiveModifier,
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -63,7 +68,7 @@ fun CategoryPicker(
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(4),
-        modifier = modifier,
+        modifier = effectiveModifier,
         contentPadding = PaddingValues(8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
