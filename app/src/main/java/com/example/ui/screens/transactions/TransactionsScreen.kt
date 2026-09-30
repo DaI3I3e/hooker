@@ -42,6 +42,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -102,6 +103,7 @@ import kotlinx.coroutines.launch
 fun TransactionsScreen(
     viewModel: TransactionsViewModel,
     onNavigateToEditTransaction: (Long) -> Unit,
+    onNavigateToAddTransaction: () -> Unit = {},
     onToggleFullscreen: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -317,6 +319,21 @@ fun TransactionsScreen(
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            if (!state.isFullscreen) {
+                FloatingActionButton(
+                    onClick = onNavigateToAddTransaction,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = Color.White,
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "ثبت تراکنش"
+                    )
+                }
+            }
+        },
         modifier = modifier
     ) { innerPadding ->
         Box(
@@ -405,13 +422,13 @@ fun TransactionsScreen(
                                 val dismissState = rememberSwipeToDismissBoxState(
                                     confirmValueChange = { value ->
                                         when (value) {
-                                            SwipeToDismissBoxValue.EndToStart -> {
-                                                // Swipe to Delete (drag toward start)
+                                            SwipeToDismissBoxValue.StartToEnd -> {
+                                                // Swipe to Delete (drag toward left in RTL)
                                                 transactionToDelete = item.transaction
                                                 false // return false so item returns to settled while dialog confirms
                                             }
-                                            SwipeToDismissBoxValue.StartToEnd -> {
-                                                // Swipe to Edit (drag toward end)
+                                            SwipeToDismissBoxValue.EndToStart -> {
+                                                // Swipe to Edit (drag toward right in RTL)
                                                 onNavigateToEditTransaction(item.transaction.id)
                                                 false // return false so item returns to settled while opening edit screen
                                             }
@@ -424,15 +441,18 @@ fun TransactionsScreen(
                                     state = dismissState,
                                     backgroundContent = {
                                         val direction = dismissState.dismissDirection
-                                        val bgColor = when (direction) {
-                                            SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
-                                            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
+                                        val isDelete = direction == SwipeToDismissBoxValue.StartToEnd
+                                        val isEdit = direction == SwipeToDismissBoxValue.EndToStart
+
+                                        val bgColor = when {
+                                            isDelete -> MaterialTheme.colorScheme.errorContainer
+                                            isEdit -> MaterialTheme.colorScheme.primaryContainer
                                             else -> Color.Transparent
                                         }
-                                        val iconAlignment = when (direction) {
-                                            SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
-                                            SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
-                                            else -> Alignment.Center
+                                        val contentColor = when {
+                                            isDelete -> MaterialTheme.colorScheme.onErrorContainer
+                                            isEdit -> MaterialTheme.colorScheme.onPrimaryContainer
+                                            else -> Color.Transparent
                                         }
 
                                         Box(
@@ -441,24 +461,46 @@ fun TransactionsScreen(
                                                 .clip(RoundedCornerShape(if (state.isFullscreen) 10.dp else 16.dp))
                                                 .background(bgColor)
                                                 .padding(horizontal = 20.dp),
-                                            contentAlignment = iconAlignment
+                                            contentAlignment = when {
+                                                isDelete -> Alignment.CenterStart
+                                                isEdit -> Alignment.CenterEnd
+                                                else -> Alignment.Center
+                                            }
                                         ) {
-                                            when (direction) {
-                                                SwipeToDismissBoxValue.EndToStart -> {
+                                            if (isDelete) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
                                                     Icon(
                                                         imageVector = Icons.Default.Delete,
                                                         contentDescription = "حذف",
-                                                        tint = MaterialTheme.colorScheme.onErrorContainer
+                                                        tint = contentColor
+                                                    )
+                                                    Text(
+                                                        text = "حذف",
+                                                        style = MaterialTheme.typography.labelLarge,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = contentColor
                                                     )
                                                 }
-                                                SwipeToDismissBoxValue.StartToEnd -> {
+                                            } else if (isEdit) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
                                                     Icon(
                                                         imageVector = Icons.Default.Edit,
                                                         contentDescription = "ویرایش",
-                                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                                        tint = contentColor
+                                                    )
+                                                    Text(
+                                                        text = "ویرایش",
+                                                        style = MaterialTheme.typography.labelLarge,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = contentColor
                                                     )
                                                 }
-                                                else -> {}
                                             }
                                         }
                                     },

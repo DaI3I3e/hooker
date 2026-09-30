@@ -140,6 +140,11 @@ fun AddRecurringTransactionScreen(
             )
 
             // Amount Input
+            Text(
+                text = if (state.isInstallment) "مبلغ هر قسط" else "مبلغ تراکنش دوره‌ای",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
             AmountInput(
                 amount = state.amount,
                 onAmountChange = { viewModel.setAmount(it) },
@@ -191,9 +196,7 @@ fun AddRecurringTransactionScreen(
                     categories = state.categories.filter { it.type.name == state.type.name || it.type.name == "BOTH" },
                     selectedCategoryId = state.selectedCategoryId,
                     onCategorySelected = { viewModel.setCategory(it.id) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 

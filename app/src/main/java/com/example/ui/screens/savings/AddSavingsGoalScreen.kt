@@ -124,6 +124,7 @@ fun AddSavingsGoalScreen(
             )
 
             // Target Amount Input
+            Text("مبلغ هدف پس‌انداز", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             AmountInput(
                 amount = state.targetAmount,
                 onAmountChange = { viewModel.setTargetAmount(it) },
@@ -131,6 +132,7 @@ fun AddSavingsGoalScreen(
             )
 
             // Initial Amount Input (optional)
+            Text("مبلغ پس‌انداز اولیه (اختیاری)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             AmountInput(
                 amount = state.initialAmount,
                 onAmountChange = { viewModel.setInitialAmount(it) },

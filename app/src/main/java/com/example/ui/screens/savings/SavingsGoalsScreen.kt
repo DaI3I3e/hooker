@@ -72,8 +72,9 @@ import com.example.util.DateFormatter
 @Composable
 fun SavingsGoalsScreen(
     viewModel: SavingsGoalsViewModel,
-    onNavigateBack: () -> Unit,
+    onNavigateBack: (() -> Unit)? = null,
     onNavigateToAdd: () -> Unit,
+    showTopBar: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -90,17 +91,21 @@ fun SavingsGoalsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("صندوق‌ها و اهداف پس‌انداز", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "بازگشت"
-                        )
+            if (showTopBar) {
+                TopAppBar(
+                    title = { Text("صندوق‌ها و اهداف پس‌انداز", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        if (onNavigateBack != null) {
+                            IconButton(onClick = onNavigateBack) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "بازگشت"
+                                )
+                            }
+                        }
                     }
-                }
-            )
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
@@ -391,7 +396,7 @@ fun SavingsGoalCard(
             ) {
                 Column {
                     Text(
-                        text = "جمع شده:",
+                        text = "پس‌انداز شده:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -405,7 +410,7 @@ fun SavingsGoalCard(
 
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "هدف نهایی:",
+                        text = "هدف:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -455,7 +460,7 @@ fun SavingsGoalCard(
                     }
                 } else {
                     Text(
-                        text = "مانده تا تکمیل: ${AmountFormatter.format(remaining)}",
+                        text = "مانده تا هدف: ${AmountFormatter.format(remaining)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

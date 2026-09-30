@@ -399,9 +399,7 @@ fun PreConfirmScreen(
                             categories = state.categories,
                             selectedCategoryId = state.selectedCategoryId,
                             onCategorySelected = { category -> viewModel.setSelectedCategory(category.id) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(220.dp)
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }

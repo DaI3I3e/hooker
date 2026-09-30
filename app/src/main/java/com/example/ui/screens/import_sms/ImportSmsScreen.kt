@@ -445,9 +445,7 @@ fun ImportSmsScreen(
                                 categories = state.categories,
                                 selectedCategoryId = state.selectedCategoryId,
                                 onCategorySelected = { viewModel.setSelectedCategory(it.id) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
 

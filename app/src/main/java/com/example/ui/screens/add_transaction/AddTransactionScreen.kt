@@ -208,7 +208,7 @@ fun AddTransactionScreen(
                     categories = state.categories,
                     selectedCategoryId = state.selectedCategory?.id,
                     onCategorySelected = { viewModel.setSelectedCategory(it) },
-                    modifier = Modifier.height(180.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 

@@ -75,8 +75,9 @@ import com.example.util.DateFormatter
 @Composable
 fun RecurringTransactionsScreen(
     viewModel: RecurringTransactionsViewModel,
-    onNavigateBack: () -> Unit,
+    onNavigateBack: (() -> Unit)? = null,
     onNavigateToAdd: () -> Unit,
+    showTopBar: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -101,17 +102,21 @@ fun RecurringTransactionsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("تراکنش‌های دوره‌ای و اقساط", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "بازگشت"
-                        )
+            if (showTopBar) {
+                TopAppBar(
+                    title = { Text("تراکنش‌های دوره‌ای و اقساط", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        if (onNavigateBack != null) {
+                            IconButton(onClick = onNavigateBack) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "بازگشت"
+                                )
+                            }
+                        }
                     }
-                }
-            )
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
@@ -321,10 +326,10 @@ fun RecurringTransactionsScreen(
                             )
                         }
                     },
-                    enabled = !isExecutingNow,
+                    enabled = !isExecutingNow && !state.isExecuting,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    if (isExecutingNow) {
+                    if (isExecutingNow || state.isExecuting) {
                         androidx.compose.material3.CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
                             color = Color.White,
@@ -338,7 +343,7 @@ fun RecurringTransactionsScreen(
             dismissButton = {
                 TextButton(
                     onClick = { itemToExecute = null },
-                    enabled = !isExecutingNow
+                    enabled = !isExecutingNow && !state.isExecuting
                 ) {
                     Text("انصراف")
                 }
@@ -474,12 +479,19 @@ fun RecurringItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = AmountFormatter.format(recurring.amount),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = typeColor
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (recurring.isInstallment) "مبلغ هر قسط: " else "مبلغ دوره: ",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = AmountFormatter.format(recurring.amount),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = typeColor
+                    )
+                }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -503,6 +515,7 @@ fun RecurringItemCard(
             if (recurring.isInstallment && recurring.totalInstallments != null && recurring.totalInstallments > 0) {
                 Spacer(modifier = Modifier.height(10.dp))
                 val progress = (recurring.paidInstallments.toFloat() / recurring.totalInstallments).coerceIn(0f, 1f)
+                val totalPaidAmount = recurring.paidInstallments * recurring.amount
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -514,13 +527,13 @@ fun RecurringItemCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "${(progress * 100).toInt()}%",
+                            text = "مجموع پرداختی: ${AmountFormatter.format(totalPaidAmount)}",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     LinearProgressIndicator(
                         progress = { progress },
                         modifier = Modifier

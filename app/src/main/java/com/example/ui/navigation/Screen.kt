@@ -49,6 +49,7 @@ sealed class Screen(val route: String) {
             return "category_detail/$categoryId?startDate=$startDate&endDate=$endDate$accPart&type=$type"
         }
     }
+    object Plans : Screen("plans")
     object Settings : Screen("settings")
     object Cheques : Screen("cheques")
     object AddCheque : Screen("add_cheque")

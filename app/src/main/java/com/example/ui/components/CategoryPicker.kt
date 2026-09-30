@@ -6,16 +6,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -43,14 +40,11 @@ fun CategoryPicker(
     onCategorySelected: (CategoryEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val effectiveModifier = Modifier
-        .fillMaxWidth()
-        .height(200.dp)
-        .then(modifier)
-
     if (categories.isEmpty()) {
         Box(
-            modifier = effectiveModifier,
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -66,82 +60,107 @@ fun CategoryPicker(
         categories.sortedWith(compareByDescending<CategoryEntity> { it.isFavorite }.thenBy { it.name })
     }
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(4),
-        modifier = effectiveModifier,
-        contentPadding = PaddingValues(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(sortedCategories, key = { it.id }) { category ->
-            val isSelected = category.id == selectedCategoryId
-            val categoryColor = Color(category.color)
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(
-                        if (isSelected) categoryColor.copy(alpha = 0.18f)
-                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                    )
-                    .border(
-                        width = if (isSelected) 2.dp else 0.dp,
-                        color = if (isSelected) categoryColor else Color.Transparent,
-                        shape = RoundedCornerShape(14.dp)
-                    )
-                    .clickable { onCategorySelected(category) }
-                    .padding(10.dp)
+        val rows = sortedCategories.chunked(4)
+        rows.forEach { rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box(
-                    modifier = Modifier.size(48.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+                rowItems.forEach { category ->
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                            .background(categoryColor),
-                        contentAlignment = Alignment.Center
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Icon(
-                            imageVector = getCategoryIcon(category.icon),
-                            contentDescription = category.name,
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp)
+                        CategoryPickerItem(
+                            category = category,
+                            isSelected = category.id == selectedCategoryId,
+                            onClick = { onCategorySelected(category) }
                         )
                     }
-
-                    if (category.isFavorite) {
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .align(Alignment.TopEnd)
-                                .clip(CircleShape)
-                                .background(Color.White)
-                                .padding(1.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = "مورد علاقه",
-                                tint = Color(0xFFFFB300),
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
                 }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = category.name,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontSize = 11.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                for (i in 0 until (4 - rowItems.size)) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun CategoryPickerItem(
+    category: CategoryEntity,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val categoryColor = Color(category.color)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (isSelected) categoryColor.copy(alpha = 0.18f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            )
+            .border(
+                width = if (isSelected) 2.dp else 0.dp,
+                color = if (isSelected) categoryColor else Color.Transparent,
+                shape = RoundedCornerShape(14.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp, horizontal = 4.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(46.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(categoryColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = getCategoryIcon(category.icon),
+                    contentDescription = category.name,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            if (category.isFavorite) {
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .align(Alignment.TopEnd)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .padding(1.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = "مورد علاقه",
+                        tint = Color(0xFFFFB300),
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = category.name,
+            style = MaterialTheme.typography.labelMedium,
+            fontSize = 11.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

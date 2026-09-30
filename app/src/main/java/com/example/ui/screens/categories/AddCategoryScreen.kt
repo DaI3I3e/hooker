@@ -16,9 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -164,39 +161,47 @@ fun AddCategoryScreen(
 
             // Icon Picker
             Text("انتخاب آیکون", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp),
-                contentPadding = PaddingValues(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            val iconRows = remember { CategoryIconsList.chunked(6) }
+            Column(
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(CategoryIconsList) { iconName ->
-                    val isSelected = state.icon == iconName
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isSelected) Color(state.color).copy(alpha = 0.2f)
-                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
-                            .border(
-                                width = if (isSelected) 2.dp else 0.dp,
-                                color = if (isSelected) Color(state.color) else Color.Transparent,
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .clickable { viewModel.setIcon(iconName) },
-                        contentAlignment = Alignment.Center
+                iconRows.forEach { rowIcons ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = getCategoryIcon(iconName),
-                            contentDescription = iconName,
-                            tint = if (isSelected) Color(state.color) else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        rowIcons.forEach { iconName ->
+                            val isSelected = state.icon == iconName
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (isSelected) Color(state.color).copy(alpha = 0.2f)
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    )
+                                    .border(
+                                        width = if (isSelected) 2.dp else 0.dp,
+                                        color = if (isSelected) Color(state.color) else Color.Transparent,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable { viewModel.setIcon(iconName) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = getCategoryIcon(iconName),
+                                    contentDescription = iconName,
+                                    tint = if (isSelected) Color(state.color) else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        val remainingInRow = 6 - rowIcons.size
+                        repeat(remainingInRow) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }

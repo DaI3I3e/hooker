@@ -55,36 +55,42 @@ class RecurringRepository(
         transactionRepository: TransactionRepository
     ): Long = withContext(Dispatchers.IO) {
         try {
-            // Prevent duplicate execution for the same recurring transaction and due date
-            val existingCount = transactionRepository.countByRecurringAndDate(recurring.id, recurring.nextDueDate)
-            if (existingCount > 0) {
-                return@withContext -1L
-            }
-
             database.withTransaction {
+                // Fetch fresh recurring state from DB inside transaction
+                val currentRecurring = database.recurringDao().getByIdSync(recurring.id) ?: recurring
+                if (!currentRecurring.isActive && currentRecurring.isInstallment) {
+                    return@withTransaction -1L
+                }
+
+                // Prevent duplicate execution atomically inside the transaction
+                val existingCount = database.transactionDao().countByRecurringAndDate(currentRecurring.id, currentRecurring.nextDueDate)
+                if (existingCount > 0) {
+                    return@withTransaction -1L
+                }
+
                 val now = System.currentTimeMillis()
-                val installmentPrefix = if (recurring.isInstallment) {
-                    val totalStr = recurring.totalInstallments?.toString() ?: "نامشخص"
-                    "قسط ${recurring.paidInstallments + 1} از $totalStr: "
+                val installmentPrefix = if (currentRecurring.isInstallment) {
+                    val totalStr = currentRecurring.totalInstallments?.toString() ?: "نامشخص"
+                    "قسط ${currentRecurring.paidInstallments + 1} از $totalStr: "
                 } else {
                     "تراکنش دوره‌ای: "
                 }
-                val noteText = (recurring.note ?: "").trim()
-                val finalNote = if (noteText.isNotEmpty()) "$installmentPrefix${recurring.title} - $noteText" else "$installmentPrefix${recurring.title}"
+                val noteText = (currentRecurring.note ?: "").trim()
+                val finalNote = if (noteText.isNotEmpty()) "$installmentPrefix${currentRecurring.title} - $noteText" else "$installmentPrefix${currentRecurring.title}"
 
                 // Validate account existence to prevent SQLite foreign key constraint violations
                 val accountDao = database.accountDao()
-                val primaryAccount = accountDao.getAccountById(recurring.accountId)
+                val primaryAccount = accountDao.getAccountById(currentRecurring.accountId)
                 val safeAccountId = if (primaryAccount != null) {
-                    recurring.accountId
+                    currentRecurring.accountId
                 } else {
                     accountDao.getFirstAccount()?.id
                 }
 
-                val safeToAccountId = if (recurring.type == com.example.data.local.entity.TransactionType.TRANSFER && recurring.toAccountId != null) {
-                    val toAccount = accountDao.getAccountById(recurring.toAccountId)
+                val safeToAccountId = if (currentRecurring.type == com.example.data.local.entity.TransactionType.TRANSFER && currentRecurring.toAccountId != null) {
+                    val toAccount = accountDao.getAccountById(currentRecurring.toAccountId)
                     if (toAccount != null && toAccount.id != safeAccountId) {
-                        recurring.toAccountId
+                        currentRecurring.toAccountId
                     } else {
                         null
                     }
@@ -92,8 +98,8 @@ class RecurringRepository(
                     null
                 }
 
-                val safeCategoryId = if (recurring.categoryId != null) {
-                    val cat = database.categoryDao().getCategoryById(recurring.categoryId)
+                val safeCategoryId = if (currentRecurring.categoryId != null) {
+                    val cat = database.categoryDao().getCategoryById(currentRecurring.categoryId)
                     cat?.id
                 } else {
                     null
@@ -101,28 +107,28 @@ class RecurringRepository(
 
                 // Create transaction with recurringId and executedForDate
                 val tx = TransactionEntity(
-                    type = recurring.type,
-                    amount = recurring.amount,
+                    type = currentRecurring.type,
+                    amount = currentRecurring.amount,
                     accountId = safeAccountId,
                     toAccountId = safeToAccountId,
                     categoryId = safeCategoryId,
                     date = now,
                     note = finalNote,
-                    recurringId = recurring.id,
-                    executedForDate = recurring.nextDueDate
+                    recurringId = currentRecurring.id,
+                    executedForDate = currentRecurring.nextDueDate
                 )
                 val txId = transactionRepository.insert(tx)
 
                 // Calculate next state
-                val newPaidCount = recurring.paidInstallments + 1
-                val shouldDeactivate = recurring.isInstallment && 
-                        recurring.totalInstallments != null && 
-                        newPaidCount >= recurring.totalInstallments
+                val newPaidCount = currentRecurring.paidInstallments + 1
+                val shouldDeactivate = currentRecurring.isInstallment && 
+                        currentRecurring.totalInstallments != null && 
+                        newPaidCount >= currentRecurring.totalInstallments
 
-                val nextDue = calculateNextDueDate(recurring.nextDueDate, recurring.period)
+                val nextDue = calculateNextDueDate(currentRecurring.nextDueDate, currentRecurring.period)
 
-                recurringDao.updateExecution(
-                    id = recurring.id,
+                database.recurringDao().updateExecution(
+                    id = currentRecurring.id,
                     nextDueDate = nextDue,
                     lastExecutedDate = now,
                     paidInstallments = newPaidCount,

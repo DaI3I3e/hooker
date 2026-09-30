@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.ReceiptLong
@@ -93,6 +94,7 @@ import com.example.ui.screens.reports.CategoryDetailScreen
 import com.example.ui.screens.reports.CategoryDetailViewModel
 import com.example.ui.screens.pattern_learner.SmsPatternLearnerScreen
 import com.example.ui.screens.pattern_learner.SmsPatternLearnerViewModel
+import com.example.ui.screens.plans.PlansScreen
 import com.example.ui.theme.ExpenseColor
 import com.example.ui.theme.IncomeColor
 import androidx.compose.runtime.LaunchedEffect
@@ -110,7 +112,6 @@ fun NavGraph(
     val currentRoute = navBackStackEntry?.destination?.route
 
     val sharedScanViewModel: SharedScanViewModel = viewModel()
-    var showFabBottomSheet by remember { mutableStateOf(false) }
     var isFullscreenMode by remember { mutableStateOf(false) }
 
     LaunchedEffect(currentRoute) {
@@ -134,159 +135,12 @@ fun NavGraph(
     val bottomNavRoutes = listOf(
         Screen.Dashboard.route,
         Screen.Transactions.route,
+        Screen.More.route,
         Screen.Reports.route,
-        Screen.More.route
+        Screen.Plans.route
     )
 
     val showBottomBar = (currentRoute in bottomNavRoutes) && !isFullscreenMode
-
-    if (showFabBottomSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showFabBottomSheet = false },
-            sheetState = rememberModalBottomSheetState()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "افزودن سریع",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                // Option 1: Import SMS
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .clickable {
-                            showFabBottomSheet = false
-                            navController.navigate(Screen.ImportSms.route)
-                        }
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Sms,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "📥 وارد کردن پیامک",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "استخراج و ثبت خودکار تراکنش از متن پیامک بانک",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                // Option 2: Add Expense
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(ExpenseColor.copy(alpha = 0.12f))
-                        .clickable {
-                            showFabBottomSheet = false
-                            navController.navigate(Screen.AddTransaction.createRoute("EXPENSE"))
-                        }
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(ExpenseColor),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.RemoveCircle,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "💸 ثبت هزینه (دستی)",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = ExpenseColor
-                        )
-                        Text(
-                            text = "ثبت پرداخت یا خرج جدید",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                // Option 3: Add Income
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(IncomeColor.copy(alpha = 0.12f))
-                        .clickable {
-                            showFabBottomSheet = false
-                            navController.navigate(Screen.AddTransaction.createRoute("INCOME"))
-                        }
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(IncomeColor),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AddCircle,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "💰 ثبت درآمد (دستی)",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = IncomeColor
-                        )
-                        Text(
-                            text = "ثبت حقوق یا دریافتی جدید",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-        }
-    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -344,38 +198,29 @@ fun NavGraph(
                         )
                     )
 
-                    // 3. Large Blue FAB in Center with label "اقدام"
-                    Box(
-                        modifier = Modifier.weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            FloatingActionButton(
-                                onClick = { showFabBottomSheet = true },
-                                shape = CircleShape,
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = Color.White,
-                                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
-                                modifier = Modifier.size(46.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "اقدام",
-                                    modifier = Modifier.size(24.dp)
-                                )
+                    // 3. More (in the Middle)
+                    val isMoreSelected = currentRoute == Screen.More.route
+                    NavigationBarItem(
+                        selected = isMoreSelected,
+                        onClick = {
+                            if (currentRoute != Screen.More.route) {
+                                navController.navigate(Screen.More.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
-                            Text(
-                                text = "اقدام",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-                    }
+                        },
+                        icon = { Icon(Icons.Default.MoreHoriz, contentDescription = "بیشتر") },
+                        label = { Text("بیشتر", fontWeight = if (isMoreSelected) FontWeight.Bold else FontWeight.Normal) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        )
+                    )
 
                     // 4. Reports
                     val isRepSelected = currentRoute == Screen.Reports.route
@@ -401,13 +246,13 @@ fun NavGraph(
                         )
                     )
 
-                    // 5. More
-                    val isMoreSelected = currentRoute == Screen.More.route
+                    // 5. Plans (برنامه‌ها)
+                    val isPlansSelected = currentRoute == Screen.Plans.route
                     NavigationBarItem(
-                        selected = isMoreSelected,
+                        selected = isPlansSelected,
                         onClick = {
-                            if (currentRoute != Screen.More.route) {
-                                navController.navigate(Screen.More.route) {
+                            if (currentRoute != Screen.Plans.route) {
+                                navController.navigate(Screen.Plans.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
                                     }
@@ -416,8 +261,8 @@ fun NavGraph(
                                 }
                             }
                         },
-                        icon = { Icon(androidx.compose.material.icons.Icons.Default.MoreHoriz, contentDescription = "بیشتر") },
-                        label = { Text("بیشتر", fontWeight = if (isMoreSelected) FontWeight.Bold else FontWeight.Normal) },
+                        icon = { Icon(Icons.Default.EventNote, contentDescription = "برنامه‌ها") },
+                        label = { Text("برنامه‌ها", fontWeight = if (isPlansSelected) FontWeight.Bold else FontWeight.Normal) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary,
                             selectedTextColor = MaterialTheme.colorScheme.primary,

@@ -78,8 +78,9 @@ import com.example.util.DateFormatter
 @Composable
 fun ChequesScreen(
     viewModel: ChequesViewModel,
-    onNavigateBack: () -> Unit,
+    onNavigateBack: (() -> Unit)? = null,
     onNavigateToAdd: () -> Unit,
+    showTopBar: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -96,17 +97,21 @@ fun ChequesScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("دفترچه چک‌های صیادی", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "بازگشت"
-                        )
+            if (showTopBar) {
+                TopAppBar(
+                    title = { Text("دفترچه چک‌های صیادی", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        if (onNavigateBack != null) {
+                            IconButton(onClick = onNavigateBack) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "بازگشت"
+                                )
+                            }
+                        }
                     }
-                }
-            )
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
@@ -406,12 +411,19 @@ fun ChequeItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = AmountFormatter.format(cheque.amount),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = typeColor
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "مبلغ چک: ",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = AmountFormatter.format(cheque.amount),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = typeColor
+                    )
+                }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(

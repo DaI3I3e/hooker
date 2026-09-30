@@ -28,6 +28,7 @@ data class RecurringUiState(
     val dueCount: Int = 0,
     val totalMonthlyCommitment: Long = 0L,
     val isLoading: Boolean = false,
+    val isExecuting: Boolean = false,
     val successMessage: String? = null,
     val errorMessage: String? = null
 )
@@ -40,13 +41,15 @@ class RecurringTransactionsViewModel(
     private val _activeTab = MutableStateFlow(RecurringFilterTab.ALL)
     private val _successMessage = MutableStateFlow<String?>(null)
     private val _errorMessage = MutableStateFlow<String?>(null)
+    private val _isExecuting = MutableStateFlow(false)
 
     val uiState: StateFlow<RecurringUiState> = combine(
         recurringRepository.getAll(),
         _activeTab,
         _successMessage,
-        _errorMessage
-    ) { allItems, tab, message, errorMsg ->
+        _errorMessage,
+        _isExecuting
+    ) { allItems, tab, message, errorMsg, executing ->
         val now = System.currentTimeMillis()
         val activeItems = allItems.filter { it.recurring.isActive }
         val dueItems = activeItems.filter { it.recurring.nextDueDate <= now }
@@ -76,6 +79,7 @@ class RecurringTransactionsViewModel(
             totalActiveCount = activeItems.size,
             dueCount = dueItems.size,
             totalMonthlyCommitment = monthlyCommitment,
+            isExecuting = executing,
             successMessage = message,
             errorMessage = errorMsg
         )
@@ -94,6 +98,8 @@ class RecurringTransactionsViewModel(
         onSuccess: () -> Unit = {},
         onError: () -> Unit = {}
     ) {
+        if (_isExecuting.value) return
+        _isExecuting.value = true
         viewModelScope.launch {
             try {
                 val title = item.recurring.title
@@ -116,6 +122,8 @@ class RecurringTransactionsViewModel(
                 android.util.Log.e("RecurringVM", "Failed to execute recurring item ${item.recurring.id}: ${item.recurring.title}", e)
                 _errorMessage.value = "خطا در ثبت تراکنش"
                 onError()
+            } finally {
+                _isExecuting.value = false
             }
         }
     }

@@ -14,9 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -158,53 +155,63 @@ fun JalaliDatePickerDialog(
                 // Days Grid with empty leading cells for first day of week
                 val emptyCellsCount = JalaliDate.getFirstDayOfWeekInMonth(selectedYear, selectedMonth)
                 val totalCells = emptyCellsCount + monthDaysCount
+                val rows = (0 until totalCells).chunked(7)
 
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(7),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(240.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(totalCells) { index ->
-                        if (index < emptyCellsCount) {
-                            // Empty placeholder cell before the 1st of the month
-                            Box(modifier = Modifier.aspectRatio(1f))
-                        } else {
-                            val day = index - emptyCellsCount + 1
-                            val isSelected = (day == selectedDay)
-                            val isToday = (selectedYear == todayJalali.year && selectedMonth == todayJalali.month && day == todayJalali.day)
+                    rows.forEach { rowIndices ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            rowIndices.forEach { index ->
+                                if (index < emptyCellsCount) {
+                                    // Empty placeholder cell before the 1st of the month
+                                    Box(modifier = Modifier.weight(1f).aspectRatio(1f))
+                                } else {
+                                    val day = index - emptyCellsCount + 1
+                                    val isSelected = (day == selectedDay)
+                                    val isToday = (selectedYear == todayJalali.year && selectedMonth == todayJalali.month && day == todayJalali.day)
 
-                            Box(
-                                modifier = Modifier
-                                    .aspectRatio(1f)
-                                    .clip(CircleShape)
-                                    .background(
-                                        when {
-                                            isSelected -> MaterialTheme.colorScheme.primary
-                                            isToday -> MaterialTheme.colorScheme.primaryContainer
-                                            else -> Color.Transparent
-                                        }
-                                    )
-                                    .border(
-                                        width = if (isToday && !isSelected) 1.5.dp else 0.dp,
-                                        color = if (isToday && !isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                        shape = CircleShape
-                                    )
-                                    .clickable { selectedDay = day },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = day.toString().toPersianDigits(),
-                                    fontSize = 14.sp,
-                                    fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
-                                    color = when {
-                                        isSelected -> MaterialTheme.colorScheme.onPrimary
-                                        isToday -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurface
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1f)
+                                            .clip(CircleShape)
+                                            .background(
+                                                when {
+                                                    isSelected -> MaterialTheme.colorScheme.primary
+                                                    isToday -> MaterialTheme.colorScheme.primaryContainer
+                                                    else -> Color.Transparent
+                                                }
+                                            )
+                                            .border(
+                                                width = if (isToday && !isSelected) 1.5.dp else 0.dp,
+                                                color = if (isToday && !isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                shape = CircleShape
+                                            )
+                                            .clickable { selectedDay = day },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = day.toString().toPersianDigits(),
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
+                                            color = when {
+                                                isSelected -> MaterialTheme.colorScheme.onPrimary
+                                                isToday -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                else -> MaterialTheme.colorScheme.onSurface
+                                            }
+                                        )
                                     }
-                                )
+                                }
+                            }
+                            // Fill remaining slots in last row
+                            val remainingInRow = 7 - rowIndices.size
+                            repeat(remainingInRow) {
+                                Box(modifier = Modifier.weight(1f).aspectRatio(1f))
                             }
                         }
                     }

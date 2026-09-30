@@ -139,6 +139,7 @@ fun AddChequeScreen(
             )
 
             // Amount Input
+            Text("مبلغ چک", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             AmountInput(
                 amount = state.amount,
                 onAmountChange = { viewModel.setAmount(it) },
