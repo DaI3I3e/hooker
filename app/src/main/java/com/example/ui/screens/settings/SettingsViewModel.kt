@@ -114,7 +114,7 @@ class SettingsViewModel(
         if (!isValid) {
             _uiState.update {
                 it.copy(
-                    userMessage = "فایل پشتیبان نامعتبر است یا ساختار فین‌ترک را ندارد.",
+                    userMessage = "فایل پشتیبان نامعتبر است یا ساختار جیب‌بان را ندارد.",
                     isErrorMessage = true
                 )
             }

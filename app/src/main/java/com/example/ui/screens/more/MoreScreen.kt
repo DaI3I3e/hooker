@@ -87,30 +87,6 @@ fun MoreScreen(
             )
 
             MoreMenuItem(
-                title = "تراکنش‌های دوره‌ای و اقساط",
-                subtitle = "پیگیری پرداخت‌های منظم، حقوق و اقساط وام",
-                icon = Icons.Default.Repeat,
-                iconColor = Color(0xFF1E88E5),
-                onClick = onNavigateToRecurring
-            )
-
-            MoreMenuItem(
-                title = "صندوق‌ها و اهداف پس‌انداز",
-                subtitle = "قلک‌های مالی، برنامه‌ریزی خرید و پس‌انداز",
-                icon = Icons.Default.Savings,
-                iconColor = Color(0xFF00897B),
-                onClick = onNavigateToSavingsGoals
-            )
-
-            MoreMenuItem(
-                title = "مدیریت چک‌های صیادی",
-                subtitle = "دفترچه چک، پیگیری چک‌های دریافتی، پرداختی و سررسیدها",
-                icon = Icons.Default.ReceiptLong,
-                iconColor = Color(0xFF8E24AA),
-                onClick = onNavigateToCheques
-            )
-
-            MoreMenuItem(
                 title = "بدهی و طلب",
                 subtitle = "مدیریت و پیگیری بدهی‌ها و طلب‌ها با دیگران",
                 icon = Icons.Default.Receipt,

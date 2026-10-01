@@ -142,8 +142,8 @@ fun TransactionCard(
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
                         text = "$amountPrefix ${AmountFormatter.format(tx.amount, includeCurrency = false)}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.SemiBold,
                         color = amountColor
                     )
                     Spacer(modifier = Modifier.width(3.dp))

@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "FinTrack"
+rootProject.name = "JeebBan"
 
 include(":app")

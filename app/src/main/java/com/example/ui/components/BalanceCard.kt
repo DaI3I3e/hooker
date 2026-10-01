@@ -160,9 +160,9 @@ fun BalanceCard(
                         ) {
                             Text(
                                 text = AmountFormatter.format(totalBalance, includeCurrency = false),
-                                style = MaterialTheme.typography.displayLarge,
+                                style = MaterialTheme.typography.displayLarge.copy(fontFeatureSettings = "tnum"),
                                 fontSize = 32.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.Black,
                                 color = Color.White
                             )
                             Spacer(modifier = Modifier.width(6.dp))

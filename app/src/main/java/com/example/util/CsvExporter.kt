@@ -58,7 +58,7 @@ object CsvExporter {
         return value
     }
 
-    fun shareCsv(context: Context, csvContent: String, fileName: String = "fintrack_report.csv") {
+    fun shareCsv(context: Context, csvContent: String, fileName: String = "jeebban_report.csv") {
         try {
             val cachePath = File(context.cacheDir, "exports")
             cachePath.mkdirs()
@@ -74,7 +74,7 @@ object CsvExporter {
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/csv"
                 putExtra(Intent.EXTRA_STREAM, fileUri)
-                putExtra(Intent.EXTRA_SUBJECT, "گزارش تراکنش‌های فین‌ترک")
+                putExtra(Intent.EXTRA_SUBJECT, "گزارش تراکنش‌های جیب‌بان")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
@@ -84,7 +84,7 @@ object CsvExporter {
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, csvContent)
-                putExtra(Intent.EXTRA_SUBJECT, "گزارش تراکنش‌های فین‌ترک")
+                putExtra(Intent.EXTRA_SUBJECT, "گزارش تراکنش‌های جیب‌بان")
             }
             context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری گزارش"))
         }

@@ -22,7 +22,7 @@ class GreetingScreenshotTest {
 
   @Test
   fun greeting_screenshot() {
-    composeTestRule.setContent { FinTrackTheme { Text("FinTrack v5") } }
+    composeTestRule.setContent { FinTrackTheme { Text("جیب‌بان") } }
 
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/greeting.png")
   }

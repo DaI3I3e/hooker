@@ -479,7 +479,7 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "محتوای فایل JSON پشتیبان فین‌ترک را در کادر زیر جای‌گذاری کنید:",
+                        text = "محتوای فایل JSON پشتیبان جیب‌بان را در کادر زیر جای‌گذاری کنید:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -554,7 +554,7 @@ fun SettingsScreen(
                             showExportOptionsDialog = false
                             try {
                                 val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                                val defaultFileName = "fintrack_backup_$timestamp.json"
+                                val defaultFileName = "jeebban_backup_$timestamp.json"
                                 createDocumentLauncher.launch(defaultFileName)
                             } catch (e: Exception) {
                                 Toast.makeText(context, "برنامه ذخیره فایل در دسترس نیست: ${e.message}", Toast.LENGTH_LONG).show()
@@ -573,7 +573,7 @@ fun SettingsScreen(
                                 try {
                                     val json = viewModel.generateBackupJson()
                                     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                                    val clip = android.content.ClipData.newPlainText("FinTrack Backup", json)
+                                    val clip = android.content.ClipData.newPlainText("JeebBan Backup", json)
                                     clipboard?.setPrimaryClip(clip)
                                     Toast.makeText(context, "متن پشتیبان با موفقیت در حافظه موقت (کلیپ‌بورد) کپی شد", Toast.LENGTH_LONG).show()
                                 } catch (e: Exception) {
@@ -916,18 +916,18 @@ fun AboutAppCard() {
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "فین‌ترک (FinTrack)",
+                    text = "جیب‌بان (JeebBan)",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "نسخه ۴.۰".toPersianDigits(),
+                    text = "نسخه ۵.۰".toPersianDigits(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "برنامه هوشمند مدیریت مالی شخصی، حساب‌ها و تراکنش‌ها به صورت ۱۰۰٪ آفلاین و امن روی دستگاه شما.",
+                    text = "اپلیکیشن هوشمند مدیریت مالی شخصی جیب‌بان، حساب‌ها و تراکنش‌ها به صورت ۱۰۰٪ آفلاین و امن روی دستگاه شما.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

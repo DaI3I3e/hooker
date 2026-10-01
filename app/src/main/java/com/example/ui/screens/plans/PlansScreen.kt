@@ -114,7 +114,9 @@ fun PlansScreen(
                         onNavigateBack = null,
                         onNavigateToAdd = onNavigateToAddRecurring,
                         showTopBar = false,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
                     )
                 }
                 1 -> {
@@ -123,7 +125,9 @@ fun PlansScreen(
                         onNavigateBack = null,
                         onNavigateToAdd = onNavigateToAddCheque,
                         showTopBar = false,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
                     )
                 }
                 2 -> {
@@ -132,7 +136,9 @@ fun PlansScreen(
                         onNavigateBack = null,
                         onNavigateToAdd = onNavigateToAddSavingsGoal,
                         showTopBar = false,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
                     )
                 }
             }

@@ -159,7 +159,7 @@ fun ReportsScreen(
                     IconButton(
                         onClick = {
                             val csv = viewModel.exportReportCsv()
-                            CsvExporter.shareCsv(context, csv, "fintrack_report.csv")
+                            CsvExporter.shareCsv(context, csv, "jeebban_report.csv")
                         }
                     ) {
                         Icon(
@@ -191,12 +191,7 @@ fun ReportsScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Financial Insights Card (Month-over-Month comparison & daily average)
-                item {
-                    FinancialInsightCard(insight = state.financialInsight)
-                }
-
-                // Summary Card (Income / Expense / Balance)
+                // 1. کارت درآمد کل / هزینه کل
                 item {
                     ReportSummaryCard(
                         totalIncome = state.totalIncome,
@@ -205,7 +200,12 @@ fun ReportsScreen(
                     )
                 }
 
-                // Donut Chart Card
+                // 2. روند درآمد و هزینه ۶ ماه اخیر
+                item {
+                    MonthlyTrendCard(monthlyTrends = state.monthlyTrends)
+                }
+
+                // 3. نمودار دونات تفکیک دسته‌ها
                 item {
                     val isExpense = state.selectedType != TransactionType.INCOME
                     val totalForType = if (isExpense) state.totalExpense else state.totalIncome
@@ -262,21 +262,7 @@ fun ReportsScreen(
                     }
                 }
 
-                // 6-Month Trend Chart
-                item {
-                    MonthlyTrendCard(monthlyTrends = state.monthlyTrends)
-                }
-
-                // Category Budgeting Section (Monthly spending limits)
-                item {
-                    CategoryBudgetSection(
-                        budgetList = state.budgetProgressList,
-                        allCategories = state.categories,
-                        onSetBudgetClick = { editingCategoryBudget = it }
-                    )
-                }
-
-                // Category Breakdowns List Header
+                // 4. تفکیک دسته‌بندی‌ها (لیست)
                 item {
                     Text(
                         text = "تفکیک دسته‌بندی‌ها",
@@ -325,6 +311,20 @@ fun ReportsScreen(
                         )
                     }
                 }
+
+                // 5. سقف بودجه ماهانه دسته‌ها
+                item {
+                    CategoryBudgetSection(
+                        budgetList = state.budgetProgressList,
+                        allCategories = state.categories,
+                        onSetBudgetClick = { editingCategoryBudget = it }
+                    )
+                }
+
+                // 6. هوش مصنوعی و بینش مالی (آخر)
+                item {
+                    FinancialInsightCard(insight = state.financialInsight)
+                }
             }
         }
     }
@@ -371,8 +371,8 @@ fun ReportSummaryCard(
                     )
                     Text(
                         text = AmountFormatter.format(totalIncome),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.Black,
                         color = IncomeColor
                     )
                 }
@@ -385,8 +385,8 @@ fun ReportSummaryCard(
                     )
                     Text(
                         text = AmountFormatter.format(totalExpense),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.Black,
                         color = ExpenseColor
                     )
                 }
@@ -411,8 +411,8 @@ fun ReportSummaryCard(
                 )
                 Text(
                     text = AmountFormatter.format(netBalance),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Black,
                     color = if (netBalance >= 0) IncomeColor else ExpenseColor
                 )
             }
@@ -742,8 +742,8 @@ fun CategorySummaryItem(
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = AmountFormatter.format(summary.totalAmount),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         text = percentageText,

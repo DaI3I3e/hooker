@@ -66,7 +66,7 @@ fun AppLockScreen(
         if (activity != null) {
             BiometricHelper.authenticate(
                 activity = activity,
-                title = "ورود به فین‌ترک",
+                title = "ورود به جیب‌بان",
                 subtitle = "برای دسترسی به اطلاعات مالی، هویت خود را تأیید کنید",
                 onSuccess = onUnlock,
                 onError = { /* Handled gracefully */ }
@@ -109,7 +109,7 @@ fun AppLockScreen(
             Spacer(modifier = Modifier.height(28.dp))
 
             Text(
-                text = "فین‌ترک قفل است",
+                text = "جیب‌بان قفل است",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground

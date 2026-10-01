@@ -35,7 +35,7 @@ object BiometricHelper {
 
     fun authenticate(
         activity: FragmentActivity,
-        title: String = "تأیید هویت فین‌ترک",
+        title: String = "تأیید هویت جیب‌بان",
         subtitle: String = "برای دسترسی به اطلاعات مالی، اثر انگشت یا رمز دستگاه را وارد کنید",
         onSuccess: () -> Unit,
         onError: (String) -> Unit = {}

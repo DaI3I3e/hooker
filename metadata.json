@@ -1,6 +1,6 @@
 {
-  "name": "FinTrack v5",
-  "description": "برنامه مدیریت مالی شخصی",
+  "name": "جیب‌بان",
+  "description": "اپلیکیشن مدیریت مالی شخصی جیب‌بان، ثبت درآمد و هزینه، اقساط، چک‌ها و اهداف پس‌انداز",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

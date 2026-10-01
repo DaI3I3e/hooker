@@ -297,7 +297,7 @@ fun TransactionsScreen(
                         IconButton(
                             onClick = {
                                 val csv = viewModel.exportTransactionsCsv()
-                                CsvExporter.shareCsv(context, csv, "fintrack_transactions.csv")
+                                CsvExporter.shareCsv(context, csv, "jeebban_transactions.csv")
                             }
                         ) {
                             Icon(
@@ -394,6 +394,7 @@ fun TransactionsScreen(
                                         if (dayIncome > 0L) {
                                             Text(
                                                 text = "+ " + AmountFormatter.format(dayIncome, includeCurrency = false),
+                                                style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                                                 color = IncomeColor,
                                                 fontSize = if (state.isFullscreen) (10.sp * state.zoomLevel) else 12.sp,
                                                 fontWeight = FontWeight.Bold
@@ -402,6 +403,7 @@ fun TransactionsScreen(
                                         if (dayExpense > 0L) {
                                             Text(
                                                 text = "- " + AmountFormatter.format(dayExpense, includeCurrency = false),
+                                                style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                                                 color = ExpenseColor,
                                                 fontSize = if (state.isFullscreen) (10.sp * state.zoomLevel) else 12.sp,
                                                 fontWeight = FontWeight.Bold

@@ -23,7 +23,7 @@ import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material.icons.filled.Sms
@@ -213,7 +213,7 @@ fun NavGraph(
                                 }
                             }
                         },
-                        icon = { Icon(Icons.Default.MoreHoriz, contentDescription = "بیشتر") },
+                        icon = { Icon(Icons.Default.GridView, contentDescription = "بیشتر") },
                         label = { Text("بیشتر", fontWeight = if (isMoreSelected) FontWeight.Bold else FontWeight.Normal) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -321,6 +321,9 @@ fun NavGraph(
                     },
                     onNavigateToCheques = {
                         navController.navigate(Screen.Cheques.route)
+                    },
+                    onNavigateToPlans = {
+                        navController.navigate(Screen.Plans.route)
                     },
                     onNavigateToSettings = {
                         navController.navigate(Screen.Settings.route)
@@ -797,6 +800,38 @@ fun NavGraph(
                 com.example.ui.screens.savings.AddSavingsGoalScreen(
                     viewModel = viewModel,
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.Plans.route) {
+                val recurringViewModel: com.example.ui.screens.recurring.RecurringTransactionsViewModel = viewModel(
+                    factory = com.example.ui.screens.recurring.RecurringTransactionsViewModel.Factory(
+                        recurringRepository = app.appModule.recurringRepository,
+                        transactionRepository = app.appModule.transactionRepository
+                    )
+                )
+                val chequesViewModel: com.example.ui.screens.cheques.ChequesViewModel = viewModel(
+                    factory = com.example.ui.screens.cheques.ChequesViewModel.Factory(
+                        chequeRepository = app.appModule.chequeRepository,
+                        accountRepository = app.appModule.accountRepository,
+                        transactionRepository = app.appModule.transactionRepository
+                    )
+                )
+                val savingsGoalsViewModel: com.example.ui.screens.savings.SavingsGoalsViewModel = viewModel(
+                    factory = com.example.ui.screens.savings.SavingsGoalsViewModel.Factory(
+                        savingsGoalRepository = app.appModule.savingsGoalRepository,
+                        accountRepository = app.appModule.accountRepository,
+                        transactionRepository = app.appModule.transactionRepository
+                    )
+                )
+
+                com.example.ui.screens.plans.PlansScreen(
+                    recurringViewModel = recurringViewModel,
+                    chequesViewModel = chequesViewModel,
+                    savingsGoalsViewModel = savingsGoalsViewModel,
+                    onNavigateToAddRecurring = { navController.navigate(Screen.AddRecurring.route) },
+                    onNavigateToAddCheque = { navController.navigate(Screen.AddCheque.route) },
+                    onNavigateToAddSavingsGoal = { navController.navigate(Screen.AddSavingsGoal.route) }
                 )
             }
         }

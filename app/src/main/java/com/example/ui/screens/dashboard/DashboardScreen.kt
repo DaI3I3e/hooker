@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.ReceiptLong
@@ -93,6 +94,7 @@ fun DashboardScreen(
     onNavigateToRecurring: () -> Unit = {},
     onNavigateToSavingsGoals: () -> Unit = {},
     onNavigateToCheques: () -> Unit = {},
+    onNavigateToPlans: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -166,38 +168,18 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Row 2: تراکنش‌های دوره‌ای، اهداف پس‌انداز، چک‌های صیادی، گزارش‌ها
+                // Row 2: برنامه‌ها، گزارش‌ها، تنظیمات
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
                     QuickAccessItem(
-                        title = "دوره‌ای و قسط",
-                        icon = Icons.Default.Repeat,
-                        color = Color(0xFF0288D1),
-                        onClick = {
-                            showMoreBottomSheet = false
-                            onNavigateToRecurring()
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                    QuickAccessItem(
-                        title = "اهداف پس‌انداز",
-                        icon = Icons.Default.Savings,
+                        title = "برنامه‌ها",
+                        icon = Icons.Default.EventNote,
                         color = Color(0xFF00897B),
                         onClick = {
                             showMoreBottomSheet = false
-                            onNavigateToSavingsGoals()
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                    QuickAccessItem(
-                        title = "چک صیادی",
-                        icon = Icons.Default.ReceiptLong,
-                        color = Color(0xFF7B1FA2),
-                        onClick = {
-                            showMoreBottomSheet = false
-                            onNavigateToCheques()
+                            onNavigateToPlans()
                         },
                         modifier = Modifier.weight(1f)
                     )
@@ -211,25 +193,6 @@ fun DashboardScreen(
                         },
                         modifier = Modifier.weight(1f)
                     )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Row 3: وارد کردن پیامک، تنظیمات
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    QuickAccessItem(
-                        title = "وارد کردن پیامک",
-                        icon = Icons.Default.MailOutline,
-                        color = Color(0xFFE91E63),
-                        onClick = {
-                            showMoreBottomSheet = false
-                            onNavigateToImportSms()
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
                     QuickAccessItem(
                         title = "تنظیمات",
                         icon = Icons.Default.Settings,
@@ -240,7 +203,6 @@ fun DashboardScreen(
                         },
                         modifier = Modifier.weight(1f)
                     )
-                    Spacer(modifier = Modifier.weight(1f))
                     Spacer(modifier = Modifier.weight(1f))
                 }
                 Spacer(modifier = Modifier.height(28.dp))
@@ -261,7 +223,7 @@ fun DashboardScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "فین‌ترک",
+                    text = "جیب‌بان",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -327,7 +289,7 @@ fun DashboardScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // 4 Icons: ثبت هزینه (قرمز)، ثبت درآمد (سبز)، اسکن پیامک‌ها (فیروزه‌ای)، سایر (خاکستری)
+                    // 5 Icons: ثبت هزینه | ثبت درآمد | اسکن پیامک | ورود پیامک | سایر
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceAround
@@ -347,10 +309,17 @@ fun DashboardScreen(
                             modifier = Modifier.weight(1f)
                         )
                         QuickAccessItem(
-                            title = "اسکن پیامک‌ها",
+                            title = "اسکن پیامک",
                             icon = Icons.Default.Sms,
                             color = Color(0xFF00ACC1),
                             onClick = onNavigateToScanSms,
+                            modifier = Modifier.weight(1f)
+                        )
+                        QuickAccessItem(
+                            title = "ورود پیامک",
+                            icon = Icons.Default.MailOutline,
+                            color = Color(0xFFE91E63),
+                            onClick = onNavigateToImportSms,
                             modifier = Modifier.weight(1f)
                         )
                         QuickAccessItem(
