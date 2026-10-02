@@ -76,7 +76,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -421,18 +423,20 @@ fun TransactionsScreen(
                             }
 
                             items(transactions, key = { it.transaction.id }) { item ->
+                                val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+
                                 val dismissState = rememberSwipeToDismissBoxState(
                                     confirmValueChange = { value ->
                                         when (value) {
                                             SwipeToDismissBoxValue.StartToEnd -> {
-                                                // Swipe to Delete (drag toward left in RTL)
-                                                transactionToDelete = item.transaction
-                                                false // return false so item returns to settled while dialog confirms
+                                                // باز شدن ویرایش
+                                                onNavigateToEditTransaction(item.transaction.id)
+                                                false // بازگشت کارت به موقعیت اولیه هنگام باز شدن صفحه ویرایش
                                             }
                                             SwipeToDismissBoxValue.EndToStart -> {
-                                                // Swipe to Edit (drag toward right in RTL)
-                                                onNavigateToEditTransaction(item.transaction.id)
-                                                false // return false so item returns to settled while opening edit screen
+                                                // دیالوگ تأیید حذف
+                                                transactionToDelete = item.transaction
+                                                false // بازگشت کارت به موقعیت اولیه برای نمایش دیالوگ تأیید
                                             }
                                             SwipeToDismissBoxValue.Settled -> false
                                         }
@@ -441,8 +445,15 @@ fun TransactionsScreen(
 
                                 SwipeToDismissBox(
                                     state = dismissState,
+                                    enableDismissFromStartToEnd = true,
+                                    enableDismissFromEndToStart = true,
                                     backgroundContent = {
-                                        val direction = dismissState.dismissDirection
+                                        val direction = when {
+                                            dismissState.dismissDirection != SwipeToDismissBoxValue.Settled -> dismissState.dismissDirection
+                                            dismissState.targetValue != SwipeToDismissBoxValue.Settled -> dismissState.targetValue
+                                            else -> SwipeToDismissBoxValue.Settled
+                                        }
+
                                         val isDelete = direction == SwipeToDismissBoxValue.StartToEnd
                                         val isEdit = direction == SwipeToDismissBoxValue.EndToStart
 
@@ -464,8 +475,8 @@ fun TransactionsScreen(
                                                 .background(bgColor)
                                                 .padding(horizontal = 20.dp),
                                             contentAlignment = when {
-                                                isDelete -> Alignment.CenterStart
-                                                isEdit -> Alignment.CenterEnd
+                                                isDelete -> AbsoluteAlignment.CenterLeft
+                                                isEdit -> AbsoluteAlignment.CenterRight
                                                 else -> Alignment.Center
                                             }
                                         ) {
@@ -477,6 +488,7 @@ fun TransactionsScreen(
                                                     Icon(
                                                         imageVector = Icons.Default.Delete,
                                                         contentDescription = "حذف",
+                                                        modifier = Modifier.size(24.dp),
                                                         tint = contentColor
                                                     )
                                                     Text(
@@ -494,6 +506,7 @@ fun TransactionsScreen(
                                                     Icon(
                                                         imageVector = Icons.Default.Edit,
                                                         contentDescription = "ویرایش",
+                                                        modifier = Modifier.size(24.dp),
                                                         tint = contentColor
                                                     )
                                                     Text(
