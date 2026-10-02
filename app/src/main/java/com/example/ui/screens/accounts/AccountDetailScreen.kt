@@ -131,13 +131,13 @@ fun AccountDetailScreen(
                                         .padding(12.dp)
                                 ) {
                                     if (!account.cardNumber.isNullOrBlank()) {
-                                        val formattedCard = account.cardNumber.chunked(4).joinToString(" - ").toPersianDigits()
+                                        val maskedCard = ("**** **** **** " + account.cardNumber.takeLast(4)).toPersianDigits()
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Text("شماره کارت:", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
-                                            Text(formattedCard, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                                            Text(maskedCard, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White)
                                         }
                                     }
                                     if (!account.shabaNumber.isNullOrBlank()) {

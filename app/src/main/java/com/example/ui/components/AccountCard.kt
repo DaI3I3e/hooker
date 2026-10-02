@@ -95,7 +95,7 @@ fun AccountCard(
                 if (!account.cardNumber.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "•••• " + account.cardNumber.takeLast(4).toPersianDigits(),
+                        text = "**** **** **** " + account.cardNumber.takeLast(4).toPersianDigits(),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         fontSize = 10.sp

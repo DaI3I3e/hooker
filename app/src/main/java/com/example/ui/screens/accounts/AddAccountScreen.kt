@@ -33,6 +33,8 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,7 +56,11 @@ import com.example.util.BankLogoBadge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,6 +91,7 @@ fun AddAccountScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    var isCardNumberVisible by remember { mutableStateOf(false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -208,6 +215,15 @@ fun AddAccountScreen(
                 label = { Text("شماره کارت (۱۶ رقم)") },
                 placeholder = { Text("۶۰۳۷۹۹۷۵۱۲۳۴۵۶۷۸") },
                 singleLine = true,
+                visualTransformation = if (isCardNumberVisible) VisualTransformation.None else PasswordVisualTransformation('*'),
+                trailingIcon = {
+                    IconButton(onClick = { isCardNumberVisible = !isCardNumberVisible }) {
+                        Icon(
+                            imageVector = if (isCardNumberVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (isCardNumberVisible) "مخفی‌سازی شماره کارت" else "نمایش شماره کارت"
+                        )
+                    }
+                },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                 ),
