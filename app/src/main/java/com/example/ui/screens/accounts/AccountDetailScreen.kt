@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -156,7 +157,10 @@ fun AccountDetailScreen(
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(
                                                     text = maskedCard,
-                                                    style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Rtl),
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        textDirection = TextDirection.Ltr,
+                                                        textAlign = TextAlign.Start
+                                                    ),
                                                     fontWeight = FontWeight.Bold,
                                                     color = Color.White
                                                 )
@@ -186,10 +190,11 @@ fun AccountDetailScreen(
                                         ) {
                                             Text("شبا:", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
                                             Text(
-                                                text = account.shabaNumber.toPersianDigits(),
+                                                text = CardDisplayUtils.formatShaba(account.shabaNumber),
                                                 style = MaterialTheme.typography.bodySmall.copy(
                                                     fontSize = 11.sp,
-                                                    textDirection = TextDirection.Ltr
+                                                    textDirection = TextDirection.Ltr,
+                                                    textAlign = TextAlign.Start
                                                 ),
                                                 fontWeight = FontWeight.Medium,
                                                 color = Color.White

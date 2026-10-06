@@ -354,13 +354,21 @@ fun SettingsScreen(
                                             fontWeight = FontWeight.Bold
                                         )
                                         if (!acc.cardNumber.isNullOrBlank()) {
-                                            Text(
-                                                text = "کارت: ${com.example.util.CardDisplayUtils.formatMaskedCard(acc.cardNumber)}",
-                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                    textDirection = androidx.compose.ui.text.style.TextDirection.Rtl
-                                                ),
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = "کارت: ",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Text(
+                                                    text = com.example.util.CardDisplayUtils.formatMaskedCard(acc.cardNumber),
+                                                    style = MaterialTheme.typography.bodySmall.copy(
+                                                        textDirection = androidx.compose.ui.text.style.TextDirection.Ltr,
+                                                        textAlign = androidx.compose.ui.text.style.TextAlign.Start
+                                                    ),
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
                                         }
                                     }
                                 }

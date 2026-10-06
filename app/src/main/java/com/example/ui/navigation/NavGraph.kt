@@ -282,7 +282,10 @@ fun NavGraph(
         ) {
             composable(Screen.Dashboard.route) {
                 val viewModel: DashboardViewModel = viewModel(
-                    factory = DashboardViewModel.Factory(app.appModule.getDashboardDataUseCase)
+                    factory = DashboardViewModel.Factory(
+                        getDashboardDataUseCase = app.appModule.getDashboardDataUseCase,
+                        categoryRepository = app.appModule.categoryRepository
+                    )
                 )
                 DashboardScreen(
                     viewModel = viewModel,

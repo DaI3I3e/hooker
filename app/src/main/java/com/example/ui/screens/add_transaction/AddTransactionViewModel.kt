@@ -32,7 +32,9 @@ data class AddTransactionUiState(
     val categories: List<CategoryEntity> = emptyList(),
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val isSuccess: Boolean = false
+    val isSuccess: Boolean = false,
+    val voiceBannerMessage: String? = null,
+    val voiceRecognizedText: String? = null
 )
 
 class AddTransactionViewModel(
@@ -107,6 +109,50 @@ class AddTransactionViewModel(
                 selectedCategory = selectedCat
             )
         }
+    }
+
+    fun prefillFromVoice(parsed: com.example.util.ParsedVoiceTransaction) {
+        viewModelScope.launch {
+            val allCats = categoryRepository.allCategories.firstOrNull() ?: emptyList()
+            val accounts = accountRepository.allAccounts.firstOrNull() ?: emptyList()
+
+            val lastAccId = settingsRepository.lastAccountId
+            val defaultAccount = accounts.find { it.id == lastAccId } ?: accounts.firstOrNull()
+
+            val type = parsed.type
+            val filteredCats = filterCategories(allCats, type)
+            val matchedCat = parsed.guessedCategory?.let { guessed ->
+                filteredCats.find { it.id == guessed.id || it.name == guessed.name }
+            } ?: filteredCats.firstOrNull()
+
+            var banner: String? = null
+            if (parsed.amountRial != null) {
+                if (parsed.isTomanDetected && parsed.tomanAmount != null) {
+                    val tomanFormatted = com.example.util.AmountFormatter.format(parsed.tomanAmount, includeCurrency = false)
+                    val rialFormatted = com.example.util.AmountFormatter.format(parsed.amountRial)
+                    banner = "مبلغ از گفتار: $tomanFormatted تومان = $rialFormatted"
+                } else {
+                    val rialFormatted = com.example.util.AmountFormatter.format(parsed.amountRial)
+                    banner = "مبلغ استخراج‌شده: $rialFormatted"
+                }
+            }
+
+            _uiState.value = _uiState.value.copy(
+                type = type,
+                amount = parsed.amountRial ?: _uiState.value.amount,
+                accounts = accounts,
+                categories = filteredCats,
+                selectedAccount = _uiState.value.selectedAccount ?: defaultAccount,
+                selectedCategory = matchedCat ?: _uiState.value.selectedCategory,
+                note = parsed.recognizedText.ifBlank { _uiState.value.note },
+                voiceBannerMessage = banner,
+                voiceRecognizedText = parsed.recognizedText
+            )
+        }
+    }
+
+    fun dismissVoiceBanner() {
+        _uiState.value = _uiState.value.copy(voiceBannerMessage = null)
     }
 
     fun setAmount(amount: Long) {

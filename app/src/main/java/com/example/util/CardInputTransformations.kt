@@ -113,14 +113,25 @@ class ShabaVisualTransformation : VisualTransformation {
 
 object CardDisplayUtils {
     /**
-     * Formats card number for masked display: **** **** **** ۱۲۳۴
-     * In RTL layout, the 4 visible digits appear on the LEFT of the asterisks group.
+     * Formats card number for masked display with strict Left-To-Right Override (\u202D ... \u202C).
+     * Visual result: Three groups of asterisks (**** **** ****) on the LEFT,
+     * and the last 4 digits (e.g., ۱۲۳۴) on the RIGHT, exactly like standard banking apps.
      */
     fun formatMaskedCard(cardNumber: String?): String {
         if (cardNumber.isNullOrBlank()) return ""
         val clean = cardNumber.filter { it.isDigit() }
         val last4 = clean.takeLast(4).toPersianDigits()
-        return "**** **** **** $last4"
+        return "\u202D**** **** **** $last4\u202C"
+    }
+
+    /**
+     * Formats Iranian Shaba number with Left-To-Right Override (\u202D ... \u202C)
+     * and Persian digits, ensuring IR remains on the left and digits follow left-to-right.
+     */
+    fun formatShaba(shabaNumber: String?): String {
+        if (shabaNumber.isNullOrBlank()) return ""
+        val formatted = shabaNumber.trim().toPersianDigits()
+        return "\u202D$formatted\u202C"
     }
 
     /**

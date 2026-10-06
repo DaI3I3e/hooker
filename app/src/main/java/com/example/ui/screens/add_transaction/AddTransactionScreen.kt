@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,6 +61,12 @@ import com.example.ui.theme.TransferColor
 import com.example.util.DateFormatter
 import java.util.Calendar
 
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import com.example.util.VoiceDataHolder
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTransactionScreen(
@@ -72,6 +79,13 @@ fun AddTransactionScreen(
     val context = LocalContext.current
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        VoiceDataHolder.pendingVoiceTransaction?.let { pending ->
+            viewModel.prefillFromVoice(pending)
+            VoiceDataHolder.clear()
+        }
+    }
 
     if (showDatePicker) {
         com.example.ui.components.JalaliDatePickerDialog(
@@ -133,6 +147,54 @@ fun AddTransactionScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Voice Input Info Banner
+            state.voiceBannerMessage?.let { banner ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = banner,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            state.voiceRecognizedText?.let { rawText ->
+                                Text(
+                                    text = "متن گفتار: «$rawText»",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+                        IconButton(onClick = { viewModel.dismissVoiceBanner() }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "بستن",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+
             // Transaction Type Tabs
             val selectedTabIndex = when (state.type) {
                 TransactionType.EXPENSE -> 0

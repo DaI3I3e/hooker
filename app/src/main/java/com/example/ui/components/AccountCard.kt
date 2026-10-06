@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -98,7 +99,10 @@ fun AccountCard(
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = CardDisplayUtils.formatMaskedCard(account.cardNumber),
-                        style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.Rtl),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            textDirection = TextDirection.Ltr,
+                            textAlign = TextAlign.Start
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         fontSize = 10.sp
                     )
