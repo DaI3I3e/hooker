@@ -96,7 +96,7 @@ object BackupCrypto {
             keyStore.load(null)
 
             if (!keyStore.containsAlias(KEY_ALIAS)) {
-                return DecryptResult.Error("فایل بکاپ با این دستگاه یا کلید امنیتی فعلی قابل رمزگشایی نیست (کلید اختصاصی این نسخه در حافظه امن یافت نشد).")
+                return DecryptResult.Error("فایل بکاپ با این دستگاه قابل بازیابی نیست")
             }
 
             val secretKey = (keyStore.getEntry(KEY_ALIAS, null) as KeyStore.SecretKeyEntry).secretKey
@@ -112,7 +112,7 @@ object BackupCrypto {
             val plainText = String(plainBytes, Charsets.UTF_8)
             DecryptResult.Success(plainText)
         } catch (e: Exception) {
-            DecryptResult.Error("فایل بکاپ با این دستگاه یا کلید امنیتی فعلی قابل رمزگشایی نیست.")
+            DecryptResult.Error("فایل بکاپ با این دستگاه قابل بازیابی نیست")
         }
     }
 

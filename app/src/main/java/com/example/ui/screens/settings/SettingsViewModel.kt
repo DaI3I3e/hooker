@@ -152,7 +152,7 @@ class SettingsViewModel(
                             pendingRestoreJson = decryptResult.jsonString,
                             pendingRestoreIsLegacy = true,
                             showRestoreDialog = true,
-                            userMessage = "فایل قدیمی (رمزنگاری‌نشده) شناسایی شد."
+                            userMessage = "فایل بکاپ قدیمی (رمزنگاری‌نشده) است"
                         )
                     }
                 }
@@ -213,7 +213,7 @@ class SettingsViewModel(
                             pendingRestoreJson = decryptResult.jsonString,
                             pendingRestoreIsLegacy = true,
                             showRestoreDialog = true,
-                            userMessage = "متن قدیمی (رمزنگاری‌نشده) شناسایی شد."
+                            userMessage = "متن بکاپ قدیمی (رمزنگاری‌نشده) است"
                         )
                     }
                 }
