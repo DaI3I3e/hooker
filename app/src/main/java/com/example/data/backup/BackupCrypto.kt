@@ -96,7 +96,7 @@ object BackupCrypto {
             keyStore.load(null)
 
             if (!keyStore.containsAlias(KEY_ALIAS)) {
-                return DecryptResult.Error("فایل بکاپ با این دستگاه قابل بازیابی نیست")
+                return DecryptResult.Error("فایل بکاپ با این دستگاه قابل بازیابی نیست. اگر اپ را حذف و نصب کرده‌اید، کلید رمزنگاری از بین رفته است؛ از بکاپ JSON قابل حمل استفاده کنید.")
             }
 
             val secretKey = (keyStore.getEntry(KEY_ALIAS, null) as KeyStore.SecretKeyEntry).secretKey
@@ -112,7 +112,7 @@ object BackupCrypto {
             val plainText = String(plainBytes, Charsets.UTF_8)
             DecryptResult.Success(plainText)
         } catch (e: Exception) {
-            DecryptResult.Error("فایل بکاپ با این دستگاه قابل بازیابی نیست")
+            DecryptResult.Error("فایل بکاپ با این دستگاه قابل بازیابی نیست. اگر اپ را حذف و نصب کرده‌اید، کلید رمزنگاری از بین رفته است؛ از بکاپ JSON قابل حمل استفاده کنید.")
         }
     }
 

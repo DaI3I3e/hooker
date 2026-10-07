@@ -97,6 +97,7 @@ fun SettingsScreen(
     var showPasteJsonDialog by remember { mutableStateOf(false) }
     var jsonInputText by remember { mutableStateOf("") }
     var showExportOptionsDialog by remember { mutableStateOf(false) }
+    var showPlainJsonWarningDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.userMessage) {
         state.userMessage?.let { msg ->
@@ -118,6 +119,29 @@ fun SettingsScreen(
                     }
                     withContext(Dispatchers.Main) {
                         Toast.makeText(context, "فایل پشتیبان رمزنگاری‌شده (.ftb) در حافظه ذخیره شد", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "خطا در ذخیره فایل پشتیبان: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
+
+    // Document Creator Launcher for Exporting Portable Plain JSON Backup (.json)
+    val createJsonDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let { destinationUri ->
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    val json = viewModel.generateBackupJson()
+                    context.contentResolver.openOutputStream(destinationUri)?.use { outputStream ->
+                        outputStream.write(json.toByteArray(Charsets.UTF_8))
+                    }
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "فایل بکاپ قابل حمل (JSON) ذخیره شد", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
@@ -574,7 +598,18 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("🔒 ذخیره فایل رمزنگاری‌شده (.ftb)")
+                        Text("🔒 بک‌آپ امن (رمزنگاری‌شده، .ftb)")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            showExportOptionsDialog = false
+                            showPlainJsonWarningDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("📄 بک‌آپ قابل حمل (بدون رمزنگاری، JSON)")
                     }
 
                     OutlinedButton(
@@ -644,6 +679,65 @@ fun SettingsScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showExportOptionsDialog = false }) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
+
+    // Warning Dialog for Plain Portable JSON Backup
+    if (showPlainJsonWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showPlainJsonWarningDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = ExpenseColor,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "هشدار بک‌آپ قابل حمل (بدون رمزنگاری)",
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "این فایل بدون رمزنگاری است و حاوی تمام اطلاعات مالی شماست. فقط در محل امن نگه دارید.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "مزیت این فایل: در صورت حذف و نصب مجدد برنامه یا جابه‌جایی به دستگاه دیگر، به سادگی و بدون وابستگی به کلید دستگاه قابل بازیابی است.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showPlainJsonWarningDialog = false
+                        try {
+                            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                            val defaultFileName = "jeebban_backup_$timestamp.json"
+                            createJsonDocumentLauncher.launch(defaultFileName)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "برنامه ذخیره فایل در دسترس نیست: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("تأیید و ذخیره JSON")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPlainJsonWarningDialog = false }) {
                     Text("انصراف")
                 }
             }

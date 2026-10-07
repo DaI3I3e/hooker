@@ -26,6 +26,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Refresh
@@ -38,8 +40,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -76,6 +80,9 @@ fun VoiceInputDialog(
     val speechManager = remember { VoiceSpeechManager(context) }
     val voiceState by speechManager.state.collectAsState()
 
+    var showManualTypeDialog by remember { mutableStateOf(false) }
+    var manualTypedText by remember { mutableStateOf("") }
+
     var hasAudioPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -92,6 +99,7 @@ fun VoiceInputDialog(
     ) { isGranted ->
         hasAudioPermission = isGranted
         if (isGranted) {
+            permissionDeniedMessage = null
             speechManager.startListening()
         } else {
             permissionDeniedMessage = "برای استفاده از ورودی صوتی، دسترسی به میکروفون ضروری است."
@@ -104,12 +112,19 @@ fun VoiceInputDialog(
         }
     }
 
+    // Explicit runtime permission check on entry
     LaunchedEffect(Unit) {
         if (!speechManager.isAvailable()) {
             // Speech recognition not supported on device
             return@LaunchedEffect
         }
-        if (hasAudioPermission) {
+        val currentGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        hasAudioPermission = currentGranted
+        if (currentGranted) {
             speechManager.startListening()
         } else {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -137,6 +152,57 @@ fun VoiceInputDialog(
         label = "pulseScale"
     )
 
+    // Manual typing fallback dialog
+    if (showManualTypeDialog) {
+        AlertDialog(
+            onDismissRequest = { showManualTypeDialog = false },
+            title = {
+                Text(
+                    text = "تایپ متن تراکنش",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "جمله یا متن تراکنش خود را بنویسید (مانند: هزینه ۵۰ هزار تومن خوراک):",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = manualTypedText,
+                        onValueChange = { manualTypedText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("مثال: واریز یک میلیون و پانصد حقوق") },
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val text = manualTypedText.trim()
+                        if (text.isNotBlank()) {
+                            val parsed = VoiceTransactionParser.parse(text, categories)
+                            onVoiceParsed(parsed)
+                            showManualTypeDialog = false
+                            speechManager.destroy()
+                            onDismissRequest()
+                        }
+                    },
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("استخراج و ثبت")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showManualTypeDialog = false }) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
+
     AlertDialog(
         onDismissRequest = {
             speechManager.destroy()
@@ -144,14 +210,35 @@ fun VoiceInputDialog(
         },
         confirmButton = {},
         dismissButton = {
-            OutlinedButton(
-                onClick = {
-                    speechManager.destroy()
-                    onDismissRequest()
-                },
-                shape = RoundedCornerShape(12.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("انصراف")
+                TextButton(
+                    onClick = {
+                        speechManager.destroy()
+                        showManualTypeDialog = true
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Keyboard,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("تایپ به جای گفتن")
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        speechManager.destroy()
+                        onDismissRequest()
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("انصراف")
+                }
             }
         },
         title = {
@@ -197,6 +284,17 @@ fun VoiceInputDialog(
                         color = MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            showManualTypeDialog = true
+                        },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Keyboard, contentDescription = null)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("تایپ دستی متن")
+                    }
                 } else if (permissionDeniedMessage != null) {
                     Icon(
                         imageVector = Icons.Default.MicOff,
@@ -211,19 +309,30 @@ fun VoiceInputDialog(
                         color = MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            permissionDeniedMessage = null
-                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                        },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("اعطای مجوز")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                permissionDeniedMessage = null
+                                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("اعطای مجوز")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                showManualTypeDialog = true
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("تایپ دستی")
+                        }
                     }
                 } else {
                     when (val currentVoiceState = voiceState) {
-                        is VoiceRecognitionState.Idle -> {
+                        is VoiceRecognitionState.Idle, is VoiceRecognitionState.Initializing -> {
                             Box(
                                 modifier = Modifier
                                     .size(76.dp)
@@ -240,9 +349,10 @@ fun VoiceInputDialog(
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "در حال آماده‌سازی...",
+                                text = "در حال آماده‌سازی و اتصال به میکروفون...",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
                             )
                         }
 
@@ -272,7 +382,7 @@ fun VoiceInputDialog(
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "در حال گوش دادن... صحبت کنید",
+                                text = "در حال شنیدن... صحبت کنید",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -359,21 +469,34 @@ fun VoiceInputDialog(
                                 textAlign = TextAlign.Center
                             )
                             Spacer(modifier = Modifier.height(16.dp))
-                            Button(
-                                onClick = {
-                                    speechManager.startListening()
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "تلاش مجدد"
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("تلاش مجدد")
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        speechManager.startListening()
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "تلاش مجدد"
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("تلاش مجدد")
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        showManualTypeDialog = true
+                                    },
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Default.Keyboard, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("تایپ به جای گفتن")
+                                }
                             }
                         }
                     }
