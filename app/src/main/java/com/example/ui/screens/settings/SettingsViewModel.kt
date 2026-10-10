@@ -4,8 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.backup.BackupManager
-import com.example.data.backup.DecryptResult
-import com.example.data.backup.RestoreExecutionResult
 import com.example.data.local.entity.AccountEntity
 import com.example.data.repository.AccountRepository
 import com.example.data.repository.SettingsRepository
@@ -28,8 +26,7 @@ data class SettingsUiState(
     val userMessage: String? = null,
     val isErrorMessage: Boolean = false,
     val showRestoreDialog: Boolean = false,
-    val pendingRestoreJson: String? = null,
-    val pendingRestoreIsLegacy: Boolean = false
+    val pendingRestoreJson: String? = null
 )
 
 class SettingsViewModel(
@@ -50,16 +47,32 @@ class SettingsViewModel(
         SettingsUiState(
             themeMode = settingsRepository.themeMode,
             lastBackupTime = settingsRepository.lastBackupTime,
-            lastBackupTimeFormatted = if (settingsRepository.lastBackupTime > 0L) {
-                DateFormatter.formatDateTime(settingsRepository.lastBackupTime)
-            } else {
-                "هرگز"
-            },
+            lastBackupTimeFormatted = DateFormatter.formatDateTime(settingsRepository.lastBackupTime),
             isBiometricEnabled = settingsRepository.isBiometricEnabled,
             isSecureScreenEnabled = settingsRepository.isSecureScreenEnabled
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        settingsRepository.isBiometricEnabled = enabled
+        _uiState.update {
+            it.copy(
+                isBiometricEnabled = enabled,
+                userMessage = if (enabled) "قفل امنیتی فعال شد" else "قفل امنیتی غیرفعال شد"
+            )
+        }
+    }
+
+    fun setSecureScreenEnabled(enabled: Boolean) {
+        settingsRepository.isSecureScreenEnabled = enabled
+        _uiState.update {
+            it.copy(
+                isSecureScreenEnabled = enabled,
+                userMessage = if (enabled) "حفاظت در برنامه‌های اخیر فعال شد" else "حفاظت در برنامه‌های اخیر غیرفعال شد"
+            )
+        }
+    }
 
     fun setThemeMode(mode: String) {
         settingsRepository.themeMode = mode
@@ -72,37 +85,27 @@ class SettingsViewModel(
         }
     }
 
-    suspend fun generateBackupEncryptedBytes(): ByteArray {
-        val bytes = backupManager.createEncryptedBackup()
-        val now = System.currentTimeMillis()
-        settingsRepository.lastBackupTime = now
-        _uiState.update {
-            it.copy(
-                lastBackupTime = now,
-                lastBackupTimeFormatted = DateFormatter.formatDateTime(now),
-                userMessage = "نسخه پشتیبان رمزنگاری‌شده (AES-256) با موفقیت ایجاد شد",
-                isErrorMessage = false
-            )
-        }
-        return bytes
-    }
-
-    suspend fun generateBackupEncryptedBase64(): String {
-        val base64 = backupManager.createEncryptedBackupBase64()
-        val now = System.currentTimeMillis()
-        settingsRepository.lastBackupTime = now
-        _uiState.update {
-            it.copy(
-                lastBackupTime = now,
-                lastBackupTimeFormatted = DateFormatter.formatDateTime(now),
-                userMessage = "متن پشتیبان رمزنگاری‌شده در کلیپ‌بورد کپی شد",
-                isErrorMessage = false
-            )
-        }
-        return base64
-    }
-
     suspend fun generateBackupJson(): String {
+        return generatePlainBackupJson()
+    }
+
+    suspend fun generateEncryptedBackup(): ByteArray {
+        val json = backupManager.createBackupJson()
+        val encrypted = com.example.data.backup.BackupCrypto.encryptBackup(json)
+        val now = System.currentTimeMillis()
+        settingsRepository.lastBackupTime = now
+        _uiState.update {
+            it.copy(
+                lastBackupTime = now,
+                lastBackupTimeFormatted = DateFormatter.formatDateTime(now),
+                userMessage = "نسخه پشتیبان امن (.ftb) با موفقیت ایجاد شد",
+                isErrorMessage = false
+            )
+        }
+        return encrypted
+    }
+
+    suspend fun generatePlainBackupJson(): String {
         val json = backupManager.createBackupJson()
         val now = System.currentTimeMillis()
         settingsRepository.lastBackupTime = now
@@ -110,14 +113,14 @@ class SettingsViewModel(
             it.copy(
                 lastBackupTime = now,
                 lastBackupTimeFormatted = DateFormatter.formatDateTime(now),
-                userMessage = "نسخه پشتیبان با موفقیت ایجاد شد",
+                userMessage = "نسخه پشتیبان قابل حمل (JSON) با موفقیت ایجاد شد",
                 isErrorMessage = false
             )
         }
         return json
     }
 
-    fun onFileSelectedForRestore(bytes: ByteArray) {
+    fun onBytesSelectedForRestore(bytes: ByteArray) {
         if (bytes.size > 25_000_000) {
             _uiState.update {
                 it.copy(
@@ -128,112 +131,19 @@ class SettingsViewModel(
             return
         }
 
-        val (decryptResult, isValid) = backupManager.decryptAndValidateBytes(bytes)
-        when (decryptResult) {
-            is DecryptResult.Error -> {
+        when (val result = com.example.data.backup.BackupCrypto.decryptBackup(bytes)) {
+            is com.example.data.backup.DecryptResult.Success -> {
+                validateAndPrepareRestore(result.jsonString)
+            }
+            is com.example.data.backup.DecryptResult.LegacyPlainJson -> {
+                validateAndPrepareRestore(result.jsonString)
+            }
+            is com.example.data.backup.DecryptResult.Error -> {
                 _uiState.update {
                     it.copy(
-                        userMessage = decryptResult.message,
+                        userMessage = result.message,
                         isErrorMessage = true
                     )
-                }
-            }
-            is DecryptResult.LegacyPlainJson -> {
-                if (!isValid) {
-                    _uiState.update {
-                        it.copy(
-                            userMessage = "فایل پشتیبان نامعتبر است یا ساختار جیب‌بان را ندارد.",
-                            isErrorMessage = true
-                        )
-                    }
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            pendingRestoreJson = decryptResult.jsonString,
-                            pendingRestoreIsLegacy = true,
-                            showRestoreDialog = true,
-                            userMessage = "فایل بکاپ قدیمی (رمزنگاری‌نشده) است"
-                        )
-                    }
-                }
-            }
-            is DecryptResult.Success -> {
-                if (!isValid) {
-                    _uiState.update {
-                        it.copy(
-                            userMessage = "فایل پشتیبان رمزگشایی شد اما ساختار داده‌های آن معتبر نیست.",
-                            isErrorMessage = true
-                        )
-                    }
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            pendingRestoreJson = decryptResult.jsonString,
-                            pendingRestoreIsLegacy = false,
-                            showRestoreDialog = true
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    fun onTextSelectedForRestore(rawText: String) {
-        if (rawText.length > 35_000_000) {
-            _uiState.update {
-                it.copy(
-                    userMessage = "حجم متن انتخاب‌شده بیش از حد مجاز است.",
-                    isErrorMessage = true
-                )
-            }
-            return
-        }
-
-        val (decryptResult, isValid) = backupManager.decryptAndValidateString(rawText)
-        when (decryptResult) {
-            is DecryptResult.Error -> {
-                _uiState.update {
-                    it.copy(
-                        userMessage = decryptResult.message,
-                        isErrorMessage = true
-                    )
-                }
-            }
-            is DecryptResult.LegacyPlainJson -> {
-                if (!isValid) {
-                    _uiState.update {
-                        it.copy(
-                            userMessage = "متن پشتیبان نامعتبر است یا ساختار جیب‌بان را ندارد.",
-                            isErrorMessage = true
-                        )
-                    }
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            pendingRestoreJson = decryptResult.jsonString,
-                            pendingRestoreIsLegacy = true,
-                            showRestoreDialog = true,
-                            userMessage = "متن بکاپ قدیمی (رمزنگاری‌نشده) است"
-                        )
-                    }
-                }
-            }
-            is DecryptResult.Success -> {
-                if (!isValid) {
-                    _uiState.update {
-                        it.copy(
-                            userMessage = "متن پشتیبان رمزگشایی شد اما ساختار داده‌های آن معتبر نیست.",
-                            isErrorMessage = true
-                        )
-                    }
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            pendingRestoreJson = decryptResult.jsonString,
-                            pendingRestoreIsLegacy = false,
-                            showRestoreDialog = true
-                        )
-                    }
                 }
             }
         }
@@ -243,45 +153,88 @@ class SettingsViewModel(
         onTextSelectedForRestore(jsonString)
     }
 
+    fun onTextSelectedForRestore(rawText: String) {
+        if (rawText.length > 25_000_000) {
+            _uiState.update {
+                it.copy(
+                    userMessage = "حجم متن وارد‌شده بیش از حد مجاز است.",
+                    isErrorMessage = true
+                )
+            }
+            return
+        }
+
+        when (val result = com.example.data.backup.BackupCrypto.decryptFromString(rawText)) {
+            is com.example.data.backup.DecryptResult.Success -> {
+                validateAndPrepareRestore(result.jsonString)
+            }
+            is com.example.data.backup.DecryptResult.LegacyPlainJson -> {
+                validateAndPrepareRestore(result.jsonString)
+            }
+            is com.example.data.backup.DecryptResult.Error -> {
+                _uiState.update {
+                    it.copy(
+                        userMessage = result.message,
+                        isErrorMessage = true
+                    )
+                }
+            }
+        }
+    }
+
+    private fun validateAndPrepareRestore(jsonString: String) {
+        val isValid = backupManager.validateBackupJson(jsonString)
+        if (!isValid) {
+            _uiState.update {
+                it.copy(
+                    userMessage = "فایل پشتیبان نامعتبر است یا ساختار جیب‌بان را ندارد.",
+                    isErrorMessage = true
+                )
+            }
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                pendingRestoreJson = jsonString,
+                showRestoreDialog = true
+            )
+        }
+    }
+
     fun confirmRestore() {
         val jsonString = _uiState.value.pendingRestoreJson ?: return
-        val isLegacy = _uiState.value.pendingRestoreIsLegacy
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, showRestoreDialog = false) }
 
             try {
                 // 1. Auto backup current state before restoring
-                backupManager.createEncryptedBackup()
+                backupManager.createBackupJson()
 
                 // 2. Perform restoration
-                val result = backupManager.restoreDecryptedJson(jsonString, isLegacy)
+                val success = backupManager.restoreBackupJson(jsonString)
                 val now = System.currentTimeMillis()
 
-                when (result) {
-                    is RestoreExecutionResult.Success -> {
-                        settingsRepository.lastBackupTime = now
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                lastBackupTime = now,
-                                lastBackupTimeFormatted = DateFormatter.formatDateTime(now),
-                                pendingRestoreJson = null,
-                                pendingRestoreIsLegacy = false,
-                                userMessage = "${result.message} (پشتیبان‌گیری خودکار انجام شد)",
-                                isErrorMessage = false
-                            )
-                        }
+                if (success) {
+                    settingsRepository.lastBackupTime = now
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            lastBackupTime = now,
+                            lastBackupTimeFormatted = DateFormatter.formatDateTime(now),
+                            pendingRestoreJson = null,
+                            userMessage = "اطلاعات با موفقیت بازیابی شدند (پشتیبان‌گیری خودکار انجام شد)",
+                            isErrorMessage = false
+                        )
                     }
-                    is RestoreExecutionResult.Error -> {
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                pendingRestoreJson = null,
-                                pendingRestoreIsLegacy = false,
-                                userMessage = result.message,
-                                isErrorMessage = true
-                            )
-                        }
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            pendingRestoreJson = null,
+                            userMessage = "خطا در بازیابی اطلاعات",
+                            isErrorMessage = true
+                        )
                     }
                 }
             } catch (e: Exception) {
@@ -289,7 +242,6 @@ class SettingsViewModel(
                     it.copy(
                         isLoading = false,
                         pendingRestoreJson = null,
-                        pendingRestoreIsLegacy = false,
                         userMessage = "خطایی رخ داد: ${e.localizedMessage}",
                         isErrorMessage = true
                     )
@@ -299,35 +251,10 @@ class SettingsViewModel(
     }
 
     fun dismissRestoreDialog() {
-        cancelRestore()
-    }
-
-    fun cancelRestore() {
         _uiState.update {
             it.copy(
                 showRestoreDialog = false,
-                pendingRestoreJson = null,
-                pendingRestoreIsLegacy = false
-            )
-        }
-    }
-
-    fun setBiometricEnabled(enabled: Boolean) {
-        settingsRepository.isBiometricEnabled = enabled
-        _uiState.update {
-            it.copy(
-                isBiometricEnabled = enabled,
-                userMessage = if (enabled) "قفل بیومتریک فعال شد" else "قفل بیومتریک غیرفعال شد"
-            )
-        }
-    }
-
-    fun setSecureScreenEnabled(enabled: Boolean) {
-        settingsRepository.isSecureScreenEnabled = enabled
-        _uiState.update {
-            it.copy(
-                isSecureScreenEnabled = enabled,
-                userMessage = if (enabled) "امنیت صفحه نمایش فعال شد" else "امنیت صفحه نمایش غیرفعال شد"
+                pendingRestoreJson = null
             )
         }
     }
@@ -340,7 +267,7 @@ class SettingsViewModel(
         private val settingsRepository: SettingsRepository,
         private val backupManager: BackupManager,
         private val accountRepository: AccountRepository,
-        private val onThemeChanged: (String) -> Unit = {}
+        private val onThemeChanged: (String) -> Unit
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {

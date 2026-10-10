@@ -30,20 +30,17 @@ data class BackupData(
     val cheques: List<ChequeEntity>? = null,
     val recurring_transactions: List<RecurringTransactionEntity>? = null,
     val savings_goals: List<SavingsGoalEntity>? = null,
-    val savings_goal_entries: List<SavingsGoalEntryEntity>? = null
+    val savings_goal_entries: List<SavingsGoalEntryEntity>? = null,
+    val group_expenses: List<com.example.data.local.entity.GroupExpenseEntity>? = null,
+    val group_expense_shares: List<com.example.data.local.entity.GroupExpenseShareEntity>? = null
 )
-
-sealed class RestoreExecutionResult {
-    data class Success(val isLegacy: Boolean, val message: String) : RestoreExecutionResult()
-    data class Error(val message: String) : RestoreExecutionResult()
-}
 
 class BackupManager(private val database: FinTrackDatabase) {
     private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
 
     companion object {
         const val CURRENT_BACKUP_FORMAT_VERSION = 1
-        const val CURRENT_DATABASE_SCHEMA_VERSION = 8
+        const val CURRENT_DATABASE_SCHEMA_VERSION = 9
     }
 
     suspend fun createBackupJson(): String = withContext(Dispatchers.IO) {
@@ -56,6 +53,8 @@ class BackupManager(private val database: FinTrackDatabase) {
         val recurringTransactions = database.recurringDao().getAllEntities().first()
         val savingsGoals = database.savingsGoalDao().getAllGoalsRaw().first()
         val savingsGoalEntries = database.savingsGoalDao().getAllEntries().first()
+        val groupExpenses = database.groupExpenseDao().getAllEntities()
+        val groupExpenseShares = database.groupExpenseDao().getAllShares()
 
         val backupData = BackupData(
             backupFormatVersion = CURRENT_BACKUP_FORMAT_VERSION,
@@ -70,66 +69,26 @@ class BackupManager(private val database: FinTrackDatabase) {
             cheques = cheques,
             recurring_transactions = recurringTransactions,
             savings_goals = savingsGoals,
-            savings_goal_entries = savingsGoalEntries
+            savings_goal_entries = savingsGoalEntries,
+            group_expenses = groupExpenses,
+            group_expense_shares = groupExpenseShares
         )
         gson.toJson(backupData)
     }
 
-    /**
-     * Creates an AES-GCM encrypted binary backup package: [12-byte IV] + [Encrypted JSON].
-     */
-    suspend fun createEncryptedBackup(): ByteArray = withContext(Dispatchers.IO) {
-        val json = createBackupJson()
-        BackupCrypto.encryptBackup(json)
-    }
-
-    /**
-     * Creates an encrypted backup encoded as Base64 text (for clipboard or text sharing).
-     */
-    suspend fun createEncryptedBackupBase64(): String = withContext(Dispatchers.IO) {
-        val bytes = createEncryptedBackup()
-        BackupCrypto.bytesToBase64(bytes)
-    }
-
-    /**
-     * Decrypts, validates, and prepares backup content from binary data.
-     */
-    fun decryptAndValidateBytes(bytes: ByteArray): Pair<DecryptResult, Boolean> {
-        val decryptResult = BackupCrypto.decryptBackup(bytes)
-        val isValid = when (decryptResult) {
-            is DecryptResult.Success -> validateBackupJson(decryptResult.jsonString)
-            is DecryptResult.LegacyPlainJson -> validateBackupJson(decryptResult.jsonString)
-            is DecryptResult.Error -> false
-        }
-        return Pair(decryptResult, isValid)
-    }
-
-    /**
-     * Decrypts, validates, and prepares backup content from string (Base64 or plain JSON).
-     */
-    fun decryptAndValidateString(rawText: String): Pair<DecryptResult, Boolean> {
-        val decryptResult = BackupCrypto.decryptFromString(rawText)
-        val isValid = when (decryptResult) {
-            is DecryptResult.Success -> validateBackupJson(decryptResult.jsonString)
-            is DecryptResult.LegacyPlainJson -> validateBackupJson(decryptResult.jsonString)
-            is DecryptResult.Error -> false
-        }
-        return Pair(decryptResult, isValid)
-    }
-
-    suspend fun restoreDecryptedJson(jsonString: String, isLegacy: Boolean): RestoreExecutionResult = withContext(Dispatchers.IO) {
+    suspend fun restoreBackupJson(jsonString: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            val backupData = gson.fromJson(jsonString, BackupData::class.java)
-                ?: return@withContext RestoreExecutionResult.Error("فایل پشتیبان ساختار نامعتبر دارد.")
+            val backupData = gson.fromJson(jsonString, BackupData::class.java) ?: return@withContext false
 
             // Reject if backup comes from a newer database schema
             val fileDbVersion = backupData.databaseSchemaVersion
             if (fileDbVersion > CURRENT_DATABASE_SCHEMA_VERSION) {
-                return@withContext RestoreExecutionResult.Error("نسخه پایگاه داده فایل پشتیبان ($fileDbVersion) از نسخه برنامه شما ($CURRENT_DATABASE_SCHEMA_VERSION) جدیدتر است. لطفاً برنامه را بروزرسانی کنید.")
+                throw IllegalStateException("نسخه پایگاه داده فایل پشتیبان ($fileDbVersion) از نسخه برنامه شما ($CURRENT_DATABASE_SCHEMA_VERSION) جدیدتر است. لطفاً برنامه را بروزرسانی کنید.")
             }
 
+            // Validate mandatory structures
             if (!validateBackupJson(jsonString)) {
-                return@withContext RestoreExecutionResult.Error("ساختار اطلاعات در فایل پشتیبان معتبر نیست.")
+                return@withContext false
             }
 
             database.withTransaction {
@@ -137,6 +96,8 @@ class BackupManager(private val database: FinTrackDatabase) {
                 database.savingsGoalDao().deleteAllEntries()
                 database.savingsGoalDao().deleteAll()
                 database.recurringDao().deleteAll()
+                database.groupExpenseDao().deleteAllShares()
+                database.groupExpenseDao().deleteAllGroupExpenses()
                 database.transactionDao().deleteAll()
                 database.chequeDao().deleteAll()
                 database.debtDao().deleteAll()
@@ -149,6 +110,7 @@ class BackupManager(private val database: FinTrackDatabase) {
                 database.categoryDao().insertAll(backupData.categories)
                 backupData.transactions.forEach { database.transactionDao().insert(it) }
 
+                // Restore optional/newer tables gracefully if present
                 backupData.debts?.let { debtList ->
                     debtList.forEach { database.debtDao().insert(it) }
                 }
@@ -172,43 +134,44 @@ class BackupManager(private val database: FinTrackDatabase) {
                 backupData.savings_goal_entries?.let { entryList ->
                     entryList.forEach { database.savingsGoalDao().insertEntry(it) }
                 }
-            }
 
-            val msg = if (isLegacy) {
-                "فایل پشتیبان قدیمی (رمزنگاری‌نشده) با موفقیت بازیابی شد."
-            } else {
-                "فایل پشتیبان امن و رمزنگاری‌شده (AES-256) با موفقیت بازیابی شد."
+                backupData.group_expenses?.let { groupList ->
+                    groupList.forEach { database.groupExpenseDao().insertGroupExpense(it) }
+                }
+
+                backupData.group_expense_shares?.let { shareList ->
+                    database.groupExpenseDao().insertShares(shareList)
+                }
             }
-            RestoreExecutionResult.Success(isLegacy, msg)
+            true
         } catch (e: Exception) {
             e.printStackTrace()
-            RestoreExecutionResult.Error("خطا در بازیابی اطلاعات: ${e.message}")
+            false
         }
-    }
-
-    suspend fun restoreBackupJson(jsonString: String): Boolean = withContext(Dispatchers.IO) {
-        val result = restoreDecryptedJson(jsonString, isLegacy = true)
-        result is RestoreExecutionResult.Success
     }
 
     fun validateBackupJson(jsonString: String): Boolean {
         return try {
             val backupData = gson.fromJson(jsonString, BackupData::class.java) ?: return false
 
+            // 1. Mandatory lists cannot be null
             if (backupData.accounts.isNullOrEmpty() || backupData.categories.isNullOrEmpty()) {
                 return false
             }
 
+            // 2. Validate accounts
             val validAccounts = backupData.accounts.all {
                 it.name.isNotBlank()
             }
             if (!validAccounts) return false
 
+            // 3. Validate categories
             val validCategories = backupData.categories.all {
                 it.name.isNotBlank()
             }
             if (!validCategories) return false
 
+            // 4. Validate transactions: amount >= 0 and positive date
             val validTransactions = backupData.transactions.all {
                 it.amount >= 0 && it.date > 0
             }

@@ -1,7 +1,6 @@
 package com.example.ui.screens.accounts
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,14 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,10 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,7 +39,6 @@ import com.example.ui.theme.ExpenseColor
 import com.example.ui.theme.IncomeColor
 import com.example.util.AmountFormatter
 import com.example.util.BankLogoBadge
-import com.example.util.CardDisplayUtils
 import com.example.util.toPersianDigits
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,7 +52,6 @@ fun AccountDetailScreen(
     val accountWithBalance = state.accountWithBalance
     val account = accountWithBalance?.account
     val accountColor = account?.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
-    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -140,82 +131,33 @@ fun AccountDetailScreen(
                                         .padding(12.dp)
                                 ) {
                                     if (!account.cardNumber.isNullOrBlank()) {
-                                        val maskedCard = CardDisplayUtils.formatMaskedCard(account.cardNumber)
+                                        val formattedCard = account.cardNumber.chunked(4).joinToString(" - ").toPersianDigits()
                                         Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                                                    val clip = android.content.ClipData.newPlainText("شماره کارت", account.cardNumber)
-                                                    clipboard?.setPrimaryClip(clip)
-                                                    android.widget.Toast.makeText(context, "شماره کارت کپی شد", android.widget.Toast.LENGTH_SHORT).show()
-                                                },
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Text("شماره کارت:", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
-                                                    text = maskedCard,
-                                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                                        textDirection = TextDirection.Ltr,
-                                                        textAlign = TextAlign.Start
-                                                    ),
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Icon(
-                                                    imageVector = Icons.Default.ContentCopy,
-                                                    contentDescription = "کپی شماره کارت",
-                                                    tint = Color.White.copy(alpha = 0.7f),
-                                                    modifier = Modifier.size(14.dp)
-                                                )
-                                            }
+                                            Text(formattedCard, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White)
                                         }
                                     }
                                     if (!account.shabaNumber.isNullOrBlank()) {
-                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Spacer(modifier = Modifier.height(4.dp))
                                         Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                                                    val clip = android.content.ClipData.newPlainText("شماره شبا", account.shabaNumber)
-                                                    clipboard?.setPrimaryClip(clip)
-                                                    android.widget.Toast.makeText(context, "شماره شبا کپی شد", android.widget.Toast.LENGTH_SHORT).show()
-                                                },
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Text("شبا:", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
-                                            Text(
-                                                text = CardDisplayUtils.formatShaba(account.shabaNumber),
-                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                    fontSize = 11.sp,
-                                                    textDirection = TextDirection.Ltr,
-                                                    textAlign = TextAlign.Start
-                                                ),
-                                                fontWeight = FontWeight.Medium,
-                                                color = Color.White
-                                            )
+                                            Text(account.shabaNumber.toPersianDigits(), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, color = Color.White)
                                         }
                                     }
                                     if (!account.cardExpiry.isNullOrBlank()) {
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        val expiryFormatted = CardDisplayUtils.formatExpiryDate(account.cardExpiry)
+                                        Spacer(modifier = Modifier.height(4.dp))
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                            horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Text("انقضا:", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
-                                            Text(
-                                                text = expiryFormatted,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                fontWeight = FontWeight.Medium,
-                                                color = Color.White
-                                            )
+                                            Text(account.cardExpiry.toPersianDigits(), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, color = Color.White)
                                         }
                                     }
                                 }

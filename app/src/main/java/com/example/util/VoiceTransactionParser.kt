@@ -1,21 +1,25 @@
 package com.example.util
 
-import com.example.data.local.entity.CategoryEntity
 import com.example.data.local.entity.TransactionType
 
 data class ParsedVoiceTransaction(
     val type: TransactionType,
-    val amountRial: Long?,
-    val tomanAmount: Long?,
-    val isTomanDetected: Boolean,
-    val guessedCategory: CategoryEntity?,
-    val recognizedText: String,
-    val note: String? = null
+    val amount: Long, // In Rial
+    val suggestedCategoryName: String?,
+    val note: String?,
+    val rawText: String
 )
 
 object VoiceTransactionParser {
 
-    private val DIGITS = mapOf(
+    private val DIGITS_MAP = mapOf(
+        '۰' to '0', '۱' to '1', '۲' to '2', '۳' to '3', '۴' to '4',
+        '۵' to '5', '۶' to '6', '۷' to '7', '۸' to '8', '۹' to '9',
+        '٠' to '0', '١' to '1', '٢' to '2', '٣' to '3', '٤' to '4',
+        '٥' to '5', '٦' to '6', '٧' to '7', '٨' to '8', '٩' to '9'
+    )
+
+    private val WORDS_TO_NUM = mapOf(
         "صفر" to 0L,
         "یک" to 1L, "یه" to 1L,
         "دو" to 2L,
@@ -49,249 +53,201 @@ object VoiceTransactionParser {
         "سیصد" to 300L,
         "چهارصد" to 400L,
         "پانصد" to 500L, "پونصد" to 500L,
-        "ششصد" to 600L,
+        "ششصد" to 600L, "شیشصد" to 600L,
         "هفتصد" to 700L,
         "هشتصد" to 800L,
         "نهصد" to 900L
     )
 
-    private val SCALES = mapOf(
-        "هزار" to 1_000L,
-        "میلیون" to 1_000_000L,
-        "میلیارد" to 1_000_000_000L
-    )
-
     private val EXPENSE_KEYWORDS = listOf(
-        "هزینه", "خرج", "برداشت", "پرداخت", "خرید", "دادم به", "دادم", "خرج کردم"
+        "هزینه", "خرج", "برداشت", "پرداخت", "پرداخت کردم", "خرید", "خریدم", "دادم", "دادم به", "خرج کردم", "کرایه"
     )
 
     private val INCOME_KEYWORDS = listOf(
-        "درآمد", "واریز", "حقوق", "رسید", "گرفتم", "دریافت کردم", "فروختم", "دریافت"
-    )
-
-    private val CATEGORY_KEYWORD_MAP = mapOf(
-        "خوراک" to listOf("خوراک", "غذا", "رستوران", "سوپرمارکت", "سوپر", "میوه", "نان", "شام", "ناهار", "صبحانه", "کیک", "گوشت", "مرغ"),
-        "حمل و نقل" to listOf("تاکسی", "اسنپ", "تپسی", "بنزین", "مترو", "اتوبوس", "سوخت", "کرایه", "پارکینگ"),
-        "سلامت" to listOf("دارو", "دکتر", "ویزیت", "آمپول", "بیمارستان", "درمان", "آزمایشگاه", "دندان", "پزشک", "داروخانه"),
-        "قبوض" to listOf("قبض", "برق", "گاز", "تلفن", "آب", "اینترنت", "شارژ"),
-        "مسکن" to listOf("اجاره", "خونه", "خانه", "رهن", "ساختمان"),
-        "خرید" to listOf("لباس", "پوشاک", "فروشگاه", "خرید", "کفش", "کیف"),
-        "تفریح" to listOf("فیلم", "سینما", "تفریح", "کافه", "گردش", "مسافرت", "هتل", "بلیط", "تور", "ورزش", "باشگاه"),
-        "آموزش" to listOf("آموزش", "کتاب", "کلاس", "دانشگاه", "مدرسه", "شهریه"),
-        "اقساط" to listOf("قسط", "وام", "بدهی", "چک")
+        "درآمد", "واریز", "حقوق", "رسید", "گرفتم", "دریافت کردم", "دریافت", "فروختم", "واریزی", "پاداش"
     )
 
     /**
-     * Parses a spoken or typed Persian transaction text into a structured result.
+     * Parses spoken Persian text and extracts transaction details.
+     * All output amounts are converted to Rial.
      */
-    fun parse(
-        text: String,
-        availableCategories: List<CategoryEntity> = emptyList()
-    ): ParsedVoiceTransaction {
-        val normalized = normalizePersianText(text)
+    fun parse(text: String, categoryNames: List<String> = emptyList()): ParsedVoiceTransaction {
+        val cleanText = normalizeText(text)
 
-        // 1. Determine transaction type
-        val type = determineTransactionType(normalized)
+        // 1. Determine Transaction Type
+        val type = determineTransactionType(cleanText)
 
-        // 2. Extract amount
-        val (rialAmount, tomanAmount, isToman) = extractAmount(normalized)
+        // 2. Determine Unit (Toman vs Rial) - default in spoken Persian is Toman
+        val isToman = cleanText.contains("تومان") || cleanText.contains("تومن") || !cleanText.contains("ریال")
 
-        // 3. Match category
-        val matchedCategory = matchCategory(normalized, availableCategories, type)
+        // 3. Extract Amount
+        val rawAmount = extractAmount(cleanText)
+        val amountInRial = if (isToman) rawAmount * 10L else rawAmount
+
+        // 4. Match Category
+        val matchedCategory = matchCategory(cleanText, categoryNames)
+
+        // 5. Build clean note
+        val note = buildNote(cleanText, matchedCategory)
 
         return ParsedVoiceTransaction(
             type = type,
-            amountRial = rialAmount,
-            tomanAmount = tomanAmount,
-            isTomanDetected = isToman,
-            guessedCategory = matchedCategory,
-            recognizedText = text.trim(),
-            note = text.trim()
+            amount = amountInRial,
+            suggestedCategoryName = matchedCategory,
+            note = note,
+            rawText = text
         )
     }
 
-    /**
-     * Normalizes Arabic chars, punctuation, and Persian digits to Latin for consistent parsing.
-     */
-    fun normalizePersianText(input: String): String {
-        var res = input
-            .replace('ي', 'ی')
-            .replace('ك', 'ک')
-            .replace('ة', 'ه')
-            .replace("،", " ")
-            .replace(",", " ")
-            .replace(".", " ")
-            .replace("!", " ")
-            .replace("؟", " ")
-            .replace("?", " ")
-            .replace("\u200C", " ") // Zero-width non-joiner to space for easier tokenization
-
-        val persianDigits = "۰۱۲۳۴۵۶۷۸۹"
-        persianDigits.forEachIndexed { i, c ->
-            res = res.replace(c, ('0' + i))
+    private fun normalizeText(text: String): String {
+        var res = text.replace("ي", "ی").replace("ك", "ک")
+        // Standardize Persian digits to Latin digits for direct parsing
+        val sb = StringBuilder()
+        for (ch in res) {
+            sb.append(DIGITS_MAP[ch] ?: ch)
         }
-
-        return res.trim().replace(Regex("\\s+"), " ")
+        res = sb.toString()
+        // Replace punctuation with spaces
+        res = res.replace(Regex("[،؛\\.,!?؟\\-]"), " ")
+        return res.trim()
     }
 
-    fun determineTransactionType(normalizedText: String): TransactionType {
-        val words = normalizedText.split(" ")
+    private fun determineTransactionType(text: String): TransactionType {
+        // Check income keywords
         for (kw in INCOME_KEYWORDS) {
-            if (normalizedText.contains(kw) || words.contains(kw)) {
-                return TransactionType.INCOME
-            }
-        }
-        for (kw in EXPENSE_KEYWORDS) {
-            if (normalizedText.contains(kw) || words.contains(kw)) {
-                return TransactionType.EXPENSE
-            }
+            if (text.contains(kw)) return TransactionType.INCOME
         }
         // Default is EXPENSE
         return TransactionType.EXPENSE
     }
 
     /**
-     * Extracts numerical amount from Persian sentence.
-     * Returns Triple(rialAmount, tomanAmount, isTomanDetected)
+     * Extracts numerical value from spoken Persian text.
+     * Handles complex combinations:
+     * - "دو میلیون و پانصد هزار" -> 2,500,000
+     * - "هشتاد و سه هزار" -> 83,000
+     * - "یک میلیون و دویست" -> 1,200,000
+     * - "دو میلیارد" -> 2,000,000,000
+     * - "۷۵۰ هزار" -> 750,000
+     * - "50000" -> 50,000
      */
-    fun extractAmount(normalizedText: String): Triple<Long?, Long?, Boolean> {
-        val words = normalizedText.split(" ")
-        val hasRial = words.contains("ریال")
-        val hasToman = words.contains("تومان") || words.contains("تومن")
+    fun extractAmount(text: String): Long {
+        val tokens = text.split(Regex("\\s+")).filter { it.isNotBlank() }
 
-        // Find contiguous segments of number words
-        val sequences = mutableListOf<List<String>>()
-        var currentSeq = mutableListOf<String>()
+        // First check for direct full digit match like "50000" or "۵۰۰۰۰"
+        for (token in tokens) {
+            if (token.matches(Regex("\\d{4,}"))) {
+                return token.toLongOrNull() ?: 0L
+            }
+        }
 
-        for (w in words) {
-            if (isNumberToken(w)) {
-                currentSeq.add(w)
-            } else if (w == "و" && currentSeq.isNotEmpty()) {
-                currentSeq.add(w)
-            } else {
-                if (currentSeq.isNotEmpty()) {
-                    while (currentSeq.isNotEmpty() && currentSeq.last() == "و") {
-                        currentSeq.removeAt(currentSeq.lastIndex)
-                    }
-                    if (currentSeq.isNotEmpty()) {
-                        sequences.add(currentSeq.toList())
-                    }
-                    currentSeq = mutableListOf()
+        // Segment words and process scales
+        var totalAmount = 0L
+        var currentBillions = 0L
+        var currentMillions = 0L
+        var currentThousands = 0L
+        var currentSmall = 0L
+
+        var i = 0
+        while (i < tokens.size) {
+            val token = tokens[i]
+
+            // Skip "و" (and) conjunction
+            if (token == "و") {
+                i++
+                continue
+            }
+
+            // Check if token is a direct number like "750" or "۲۵"
+            val directNumber = token.toLongOrNull()
+            if (directNumber != null) {
+                currentSmall += directNumber
+                i++
+                continue
+            }
+
+            // Check if token is in WORDS_TO_NUM
+            val wordVal = WORDS_TO_NUM[token]
+            if (wordVal != null) {
+                currentSmall += wordVal
+                i++
+                continue
+            }
+
+            // Check scales
+            when (token) {
+                "میلیارد" -> {
+                    val multiplier = if (currentSmall == 0L) 1L else currentSmall
+                    currentBillions += multiplier * 1_000_000_000L
+                    currentSmall = 0L
+                }
+                "میلیون" -> {
+                    val multiplier = if (currentSmall == 0L) 1L else currentSmall
+                    currentMillions += multiplier * 1_000_000L
+                    currentSmall = 0L
+                }
+                "هزار" -> {
+                    val multiplier = if (currentSmall == 0L) 1L else currentSmall
+                    currentThousands += multiplier * 1_000L
+                    currentSmall = 0L
                 }
             }
-        }
-        if (currentSeq.isNotEmpty()) {
-            while (currentSeq.isNotEmpty() && currentSeq.last() == "و") {
-                currentSeq.removeAt(currentSeq.lastIndex)
-            }
-            if (currentSeq.isNotEmpty()) {
-                sequences.add(currentSeq.toList())
-            }
+            i++
         }
 
-        if (sequences.isEmpty()) {
-            return Triple(null, null, false)
+        // Heuristic: If we had millions like "یک میلیون و دویست" (no "هزار" explicitly mentioned after 200),
+        // 200 after million means 200,000!
+        if (currentMillions > 0 && currentThousands == 0L && currentSmall in 1..999) {
+            currentThousands = currentSmall * 1000L
+            currentSmall = 0L
         }
 
-        // Evaluate all number sequences and select the most significant amount
-        var bestVal = 0L
-        for (seq in sequences) {
-            val tokens = seq.filter { it != "و" }
-            val parsedVal = parseNumberTokens(tokens)
-            if (parsedVal > bestVal) {
-                bestVal = parsedVal
-            }
-        }
-
-        if (bestVal <= 0L) {
-            return Triple(null, null, false)
-        }
-
-        // Currency unit conversion:
-        // If user says "ریال" -> base amount is Rial
-        // If user says "تومان" / "تومن" or says nothing -> base amount is Toman (Rial = amount * 10)
-        return if (hasRial && !hasToman) {
-            val rial = bestVal
-            val toman = bestVal / 10
-            Triple(rial, toman, false)
-        } else {
-            val toman = bestVal
-            val rial = bestVal * 10
-            Triple(rial, toman, true)
-        }
+        totalAmount = currentBillions + currentMillions + currentThousands + currentSmall
+        return totalAmount
     }
 
-    private fun isNumberToken(token: String): Boolean {
-        if (token.toLongOrNull() != null) return true
-        if (DIGITS.containsKey(token)) return true
-        if (SCALES.containsKey(token)) return true
-        return false
-    }
+    private fun matchCategory(text: String, categoryNames: List<String>): String? {
+        // 1. Direct match with user categories
+        for (cat in categoryNames) {
+            val cleanCat = normalizeText(cat)
+            if (cleanCat.isNotBlank() && text.contains(cleanCat)) {
+                return cat
+            }
+        }
 
-    /**
-     * Parses a list of number tokens (e.g., ["هشتاد", "سه", "هزار"] or ["50000"] or ["2", "میلیون"])
-     */
-    fun parseNumberTokens(tokens: List<String>): Long {
-        var total = 0L
-        var current = 0L
+        // 2. Common category synonyms mapping
+        val synonyms = mapOf(
+            "خوراک" to listOf("غذا", "رستوران", "ناهار", "شام", "صبحانه", "سوپرمارکت", "میوه", "نان", "کافه"),
+            "حمل و نقل" to listOf("تاکسی", "اسنپ", "تپسی", "بنزین", "مترو", "اتوبوس", "کرایه"),
+            "پوشاک" to listOf("لباس", "کفش", "شلوار", "پیراهن"),
+            "خانه" to listOf("اجاره", "قبض", "برق", "آب", "گاز", "شارژ"),
+            "سلامت" to listOf("دارو", "دکتر", "پزشک", "داروخانه", "درمان"),
+            "تفریح" to listOf("سینما", "کتاب", "بازی", "ورزش", "استخر"),
+            "حقوق" to listOf("حقوق", "دستمزد", "پاداش", "عیدی")
+        )
 
-        for (t in tokens) {
-            val directNum = t.toLongOrNull()
-            if (directNum != null) {
-                current += directNum
-            } else if (DIGITS.containsKey(t)) {
-                current += DIGITS[t] ?: 0L
-            } else if (SCALES.containsKey(t)) {
-                val scale = SCALES[t] ?: 1L
-                if (current == 0L) {
-                    current = 1L
+        for ((targetCat, words) in synonyms) {
+            for (w in words) {
+                if (text.contains(w)) {
+                    // Check if user has this targetCat or synonym in categories
+                    val matched = categoryNames.find { it.contains(targetCat) || it.contains(w) }
+                    return matched ?: targetCat
                 }
-                total += current * scale
-                current = 0L
-            }
-        }
-
-        // Colloquial Persian handling: e.g. "یک میلیون و دویست" implies 1,200,000 (دویست هزار)
-        if (total >= 1_000_000L && current in 1L..999L) {
-            total += current * 1_000L
-        } else {
-            total += current
-        }
-
-        return total
-    }
-
-    /**
-     * Matches sentence against actual user categories or predefined category keywords.
-     */
-    fun matchCategory(
-        normalizedText: String,
-        categories: List<CategoryEntity>,
-        type: TransactionType
-    ): CategoryEntity? {
-        val words = normalizedText.split(" ")
-
-        // 1. Direct match with user's existing category names
-        val exactMatch = categories.find { cat ->
-            val catNormalized = normalizePersianText(cat.name).lowercase()
-            normalizedText.contains(catNormalized) || words.contains(catNormalized)
-        }
-        if (exactMatch != null) return exactMatch
-
-        // 2. Keyword dictionary match mapped to existing categories
-        for ((catKey, keywords) in CATEGORY_KEYWORD_MAP) {
-            val hasKeyword = keywords.any { kw ->
-                normalizedText.contains(kw) || words.contains(kw)
-            }
-            if (hasKeyword) {
-                val found = categories.find { cat ->
-                    val catName = cat.name.lowercase()
-                    catName.contains(catKey) || catKey.contains(catName)
-                }
-                if (found != null) return found
             }
         }
 
         return null
+    }
+
+    private fun buildNote(text: String, matchedCategory: String?): String? {
+        // Clean out known keywords to generate clean note
+        var cleaned = text
+        for (kw in EXPENSE_KEYWORDS + INCOME_KEYWORDS) {
+            cleaned = cleaned.replace(kw, "")
+        }
+        cleaned = cleaned.replace("تومان", "").replace("تومن", "").replace("ریال", "")
+        cleaned = cleaned.replace(Regex("\\s+"), " ").trim()
+
+        return if (cleaned.length > 2) cleaned else matchedCategory
     }
 }

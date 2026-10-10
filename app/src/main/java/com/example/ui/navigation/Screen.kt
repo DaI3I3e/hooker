@@ -57,6 +57,7 @@ sealed class Screen(val route: String) {
     object AddRecurring : Screen("add_recurring")
     object SavingsGoals : Screen("savings_goals")
     object AddSavingsGoal : Screen("add_savings_goal")
+    object GroupExpenses : Screen("group_expenses")
     object PatternLearner : Screen("pattern_learner?accountId={accountId}&initialText={initialText}") {
         fun createRoute(accountId: Long? = null, initialText: String? = null): String {
             val accPart = if (accountId != null) "accountId=$accountId" else "accountId=-1"

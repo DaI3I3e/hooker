@@ -32,14 +32,7 @@ import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Sms
-import androidx.compose.material3.LocalTextStyle
-import com.example.util.CardNumberVisualTransformation
-import com.example.util.CardExpiryVisualTransformation
-import com.example.util.ShabaVisualTransformation
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,11 +54,7 @@ import com.example.util.BankLogoBadge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,7 +85,6 @@ fun AddAccountScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
-    var isCardNumberVisible by remember { mutableStateOf(false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -215,68 +203,41 @@ fun AddAccountScreen(
             
             OutlinedTextField(
                 value = state.cardNumber,
-                onValueChange = { input ->
-                    val digits = input.filter { it.isDigit() }.take(16)
-                    viewModel.setCardNumber(digits)
-                },
+                onValueChange = { if (it.length <= 16 && it.all { c -> c.isDigit() }) viewModel.setCardNumber(it) },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("شماره کارت (۱۶ رقم)") },
-                placeholder = { Text("۶۰۳۷ ۹۹۷۵ ۱۲۳۴ ۵۶۷۸") },
+                placeholder = { Text("۶۰۳۷۹۹۷۵۱۲۳۴۵۶۷۸") },
                 singleLine = true,
-                visualTransformation = CardNumberVisualTransformation(),
-                trailingIcon = {
-                    if (state.cardNumber.isNotBlank()) {
-                        IconButton(onClick = {
-                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                            val clip = android.content.ClipData.newPlainText("شماره کارت", state.cardNumber)
-                            clipboard?.setPrimaryClip(clip)
-                            android.widget.Toast.makeText(context, "شماره کارت کپی شد", android.widget.Toast.LENGTH_SHORT).show()
-                        }) {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "کپی شماره کارت خام"
-                            )
-                        }
-                    }
-                },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                 ),
                 shape = RoundedCornerShape(12.dp)
             )
 
-            OutlinedTextField(
-                value = state.shabaNumber,
-                onValueChange = { viewModel.setShabaNumber(it) },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("شماره شبا (با IR)") },
-                placeholder = { Text("IR000000000000000000000000") },
-                textStyle = LocalTextStyle.current.copy(
-                    fontSize = 13.sp,
-                    textDirection = androidx.compose.ui.text.style.TextDirection.Ltr
-                ),
-                singleLine = false,
-                maxLines = 2,
-                visualTransformation = ShabaVisualTransformation(),
-                shape = RoundedCornerShape(12.dp)
-            )
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = state.shabaNumber,
+                    onValueChange = { viewModel.setShabaNumber(it) },
+                    modifier = Modifier.weight(1.5f),
+                    label = { Text("شماره شبا") },
+                    placeholder = { Text("IR000000000000000000000000") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
 
-            OutlinedTextField(
-                value = state.cardExpiry,
-                onValueChange = { input ->
-                    val digits = input.filter { it.isDigit() }.take(4)
-                    viewModel.setCardExpiry(digits)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("تاریخ انقضای کارت (ماه/سال)") },
-                placeholder = { Text("۱۲/۰۸") },
-                singleLine = true,
-                visualTransformation = CardExpiryVisualTransformation(),
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
+                OutlinedTextField(
+                    value = state.cardExpiry,
+                    onValueChange = { viewModel.setCardExpiry(it) },
+                    modifier = Modifier.weight(1f),
+                    label = { Text("انقضا") },
+                    placeholder = { Text("04/08") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
 
             // Bank Logo Selection (17 Major Iranian Banks + Gallery + No Logo)
             Text("لوگوی حساب و بانک", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

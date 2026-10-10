@@ -282,10 +282,7 @@ fun NavGraph(
         ) {
             composable(Screen.Dashboard.route) {
                 val viewModel: DashboardViewModel = viewModel(
-                    factory = DashboardViewModel.Factory(
-                        getDashboardDataUseCase = app.appModule.getDashboardDataUseCase,
-                        categoryRepository = app.appModule.categoryRepository
-                    )
+                    factory = DashboardViewModel.Factory(app.appModule.getDashboardDataUseCase)
                 )
                 DashboardScreen(
                     viewModel = viewModel,
@@ -413,7 +410,8 @@ fun NavGraph(
                         accountRepository = app.appModule.accountRepository,
                         categoryRepository = app.appModule.categoryRepository,
                         settingsRepository = app.appModule.settingsRepository,
-                        addTransactionUseCase = app.appModule.addTransactionUseCase
+                        addTransactionUseCase = app.appModule.addTransactionUseCase,
+                        groupExpenseRepository = app.appModule.groupExpenseRepository
                     )
                 )
                 AddTransactionScreen(
@@ -554,10 +552,24 @@ fun NavGraph(
                     onNavigateToAccounts = { navController.navigate(Screen.Accounts.route) },
                     onNavigateToCategories = { navController.navigate(Screen.Categories.route) },
                     onNavigateToDebts = { navController.navigate(Screen.Debts.route) },
+                    onNavigateToGroupExpenses = { navController.navigate(Screen.GroupExpenses.route) },
                     onNavigateToRecurring = { navController.navigate(Screen.Recurring.route) },
                     onNavigateToSavingsGoals = { navController.navigate(Screen.SavingsGoals.route) },
                     onNavigateToCheques = { navController.navigate(Screen.Cheques.route) },
                     onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
+                )
+            }
+
+            composable(Screen.GroupExpenses.route) {
+                val viewModel: com.example.ui.screens.group_expenses.GroupExpensesViewModel = viewModel(
+                    factory = com.example.ui.screens.group_expenses.GroupExpensesViewModel.Factory(
+                        groupExpenseRepository = app.appModule.groupExpenseRepository,
+                        accountRepository = app.appModule.accountRepository
+                    )
+                )
+                com.example.ui.screens.group_expenses.GroupExpensesScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
 

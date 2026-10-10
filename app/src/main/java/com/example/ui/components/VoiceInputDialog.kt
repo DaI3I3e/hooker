@@ -1,7 +1,15 @@
 package com.example.ui.components
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -25,30 +33,28 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,447 +69,453 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.example.data.local.entity.CategoryEntity
+import com.example.data.local.entity.TransactionType
+import com.example.ui.theme.ExpenseColor
+import com.example.ui.theme.IncomeColor
+import com.example.util.AmountFormatter
 import com.example.util.ParsedVoiceTransaction
-import com.example.util.VoiceRecognitionState
-import com.example.util.VoiceSpeechManager
 import com.example.util.VoiceTransactionParser
+
+enum class VoiceInputState {
+    IDLE,
+    LISTENING,
+    PROCESSING,
+    RESULT_READY,
+    ERROR
+}
 
 @Composable
 fun VoiceInputDialog(
-    onDismissRequest: () -> Unit,
-    categories: List<CategoryEntity>,
-    onVoiceParsed: (ParsedVoiceTransaction) -> Unit,
-    modifier: Modifier = Modifier
+    categoryNames: List<String>,
+    onDismiss: () -> Unit,
+    onTransactionParsed: (ParsedVoiceTransaction) -> Unit
 ) {
     val context = LocalContext.current
-    val speechManager = remember { VoiceSpeechManager(context) }
-    val voiceState by speechManager.state.collectAsState()
 
-    var showManualTypeDialog by remember { mutableStateOf(false) }
-    var manualTypedText by remember { mutableStateOf("") }
+    var state by remember { mutableStateOf(VoiceInputState.IDLE) }
+    var statusText by remember { mutableStateOf("برای شروع صحبت دکمه میکروفون را لمس کنید") }
+    var recognizedText by remember { mutableStateOf("") }
+    var parsedTransaction by remember { mutableStateOf<ParsedVoiceTransaction?>(null) }
+    var speechRecognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
+    var rmsLevel by remember { mutableFloatStateOf(0f) }
 
-    var hasAudioPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
-        )
+    val isRecognitionAvailable = remember { SpeechRecognizer.isRecognitionAvailable(context) }
+
+    // System Speech Recognizer Activity Launcher (Fallback for older devices)
+    val systemSpeechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        if (activityResult.resultCode == Activity.RESULT_OK) {
+            val spokenTexts = activityResult.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val bestText = spokenTexts?.firstOrNull()
+            if (!bestText.isNullOrBlank()) {
+                recognizedText = bestText
+                state = VoiceInputState.PROCESSING
+                statusText = "در حال پردازش گفتار..."
+                val parsed = VoiceTransactionParser.parse(bestText, categoryNames)
+                parsedTransaction = parsed
+                state = VoiceInputState.RESULT_READY
+                statusText = "متن با موفقیت پردازش شد"
+            } else {
+                state = VoiceInputState.ERROR
+                statusText = "صدایی دریافت نشد"
+            }
+        }
     }
 
-    var permissionDeniedMessage by remember { mutableStateOf<String?>(null) }
+    fun launchSystemSpeechIntent() {
+        try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR")
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "تراکنش خود را بگویید (مثلاً: هزینه پنجاه هزار تومن خوراک)")
+            }
+            systemSpeechLauncher.launch(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "سرویس ورودی صوتی سیستم در دسترس نیست: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
 
+    fun stopListening() {
+        try {
+            speechRecognizer?.stopListening()
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {
+            // ignore
+        }
+        speechRecognizer = null
+    }
+
+    fun startListeningInternal() {
+        stopListening()
+
+        if (!isRecognitionAvailable) {
+            statusText = "سرویس تشخیص گفتار داخلی در دسترس نیست. از دیالوگ صوتی سیستم استفاده کنید."
+            state = VoiceInputState.ERROR
+            return
+        }
+
+        try {
+            val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
+            speechRecognizer = recognizer
+
+            recognizer.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    state = VoiceInputState.LISTENING
+                    statusText = "در حال شنیدن... صحبت کنید"
+                }
+
+                override fun onBeginningOfSpeech() {
+                    state = VoiceInputState.LISTENING
+                    statusText = "در حال دریافت صدا..."
+                }
+
+                override fun onRmsChanged(rmsdB: Float) {
+                    rmsLevel = rmsdB
+                }
+
+                override fun onBufferReceived(buffer: ByteArray?) {}
+
+                override fun onEndOfSpeech() {
+                    state = VoiceInputState.PROCESSING
+                    statusText = "در حال پردازش گفتار..."
+                }
+
+                override fun onError(error: Int) {
+                    state = VoiceInputState.ERROR
+                    val errorMsg = when (error) {
+                        SpeechRecognizer.ERROR_NO_MATCH -> "صدایی شنیده نشد، دوباره تلاش کنید"
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "صدایی شنیده نشد (پایان زمان)"
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "مجوز میکروفون داده نشده است"
+                        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
+                            "خطای اتصال شبکه جهت تشخیص گفتار"
+                        SpeechRecognizer.ERROR_CLIENT, SpeechRecognizer.ERROR_SERVER ->
+                            "پاسخی از سرویس تشخیص گفتار دریافت نشد. می‌توانید از دیالوگ صوتی سیستم یا تایپ استفاده کنید."
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "سرویس گفتار مشغول است، مجدداً امتحان کنید"
+                        else -> "خطا در تشخیص گفتار (کد $error). از دکمه سیستم استفاده کنید."
+                    }
+                    statusText = errorMsg
+                    stopListening()
+                }
+
+                override fun onResults(results: Bundle?) {
+                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    val bestText = matches?.firstOrNull()
+
+                    if (!bestText.isNullOrBlank()) {
+                        recognizedText = bestText
+                        val parsed = VoiceTransactionParser.parse(bestText, categoryNames)
+                        parsedTransaction = parsed
+                        state = VoiceInputState.RESULT_READY
+                        statusText = "متن با موفقیت پردازش شد"
+                    } else {
+                        state = VoiceInputState.ERROR
+                        statusText = "متنی استخراج نشد"
+                    }
+                    stopListening()
+                }
+
+                override fun onPartialResults(partialResults: Bundle?) {
+                    val partials = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    partials?.firstOrNull()?.let {
+                        recognizedText = it
+                    }
+                }
+
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR")
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            }
+
+            state = VoiceInputState.LISTENING
+            statusText = "در حال آماده‌سازی..."
+            recognizer.startListening(intent)
+        } catch (e: Exception) {
+            state = VoiceInputState.ERROR
+            statusText = "خطا در راه‌اندازی ضبط: ${e.message}"
+            stopListening()
+        }
+    }
+
+    // Permission Launcher
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        hasAudioPermission = isGranted
         if (isGranted) {
-            permissionDeniedMessage = null
-            speechManager.startListening()
+            startListeningInternal()
         } else {
-            permissionDeniedMessage = "برای استفاده از ورودی صوتی، دسترسی به میکروفون ضروری است."
+            state = VoiceInputState.ERROR
+            statusText = "برای ثبت صوتی، مجوز دسترسی به میکروفون الزامی است."
         }
     }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            speechManager.destroy()
-        }
-    }
-
-    // Explicit runtime permission check on entry
-    LaunchedEffect(Unit) {
-        if (!speechManager.isAvailable()) {
-            // Speech recognition not supported on device
-            return@LaunchedEffect
-        }
-        val currentGranted = ContextCompat.checkSelfPermission(
+    fun requestPermissionAndStart() {
+        val hasPermission = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.RECORD_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
 
-        hasAudioPermission = currentGranted
-        if (currentGranted) {
-            speechManager.startListening()
+        if (hasPermission) {
+            startListeningInternal()
         } else {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
-    // Handle success
-    LaunchedEffect(voiceState) {
-        if (voiceState is VoiceRecognitionState.Success) {
-            val text = (voiceState as VoiceRecognitionState.Success).recognizedText
-            val parsed = VoiceTransactionParser.parse(text, categories)
-            onVoiceParsed(parsed)
-            onDismissRequest()
+    DisposableEffect(Unit) {
+        onDispose {
+            stopListening()
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "voicePulse")
+    // Pulse animation when listening
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 1.25f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
+            animation = tween(700, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulseScale"
     )
 
-    // Manual typing fallback dialog
-    if (showManualTypeDialog) {
-        AlertDialog(
-            onDismissRequest = { showManualTypeDialog = false },
-            title = {
-                Text(
-                    text = "تایپ متن تراکنش",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "جمله یا متن تراکنش خود را بنویسید (مانند: هزینه ۵۰ هزار تومن خوراک):",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedTextField(
-                        value = manualTypedText,
-                        onValueChange = { manualTypedText = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("مثال: واریز یک میلیون و پانصد حقوق") },
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val text = manualTypedText.trim()
-                        if (text.isNotBlank()) {
-                            val parsed = VoiceTransactionParser.parse(text, categories)
-                            onVoiceParsed(parsed)
-                            showManualTypeDialog = false
-                            speechManager.destroy()
-                            onDismissRequest()
-                        }
-                    },
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("استخراج و ثبت")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showManualTypeDialog = false }) {
-                    Text("انصراف")
-                }
-            }
-        )
-    }
-
     AlertDialog(
         onDismissRequest = {
-            speechManager.destroy()
-            onDismissRequest()
+            stopListening()
+            onDismiss()
         },
-        confirmButton = {},
-        dismissButton = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(
+                        when (state) {
+                            VoiceInputState.LISTENING -> MaterialTheme.colorScheme.primaryContainer
+                            VoiceInputState.RESULT_READY -> IncomeColor.copy(alpha = 0.2f)
+                            VoiceInputState.ERROR -> MaterialTheme.colorScheme.errorContainer
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                TextButton(
-                    onClick = {
-                        speechManager.destroy()
-                        showManualTypeDialog = true
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Keyboard,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                if (state == VoiceInputState.LISTENING) {
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .scale(pulseScale)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("تایپ به جای گفتن")
                 }
 
-                OutlinedButton(
-                    onClick = {
-                        speechManager.destroy()
-                        onDismissRequest()
+                Icon(
+                    imageVector = when (state) {
+                        VoiceInputState.RESULT_READY -> Icons.Default.Check
+                        VoiceInputState.ERROR -> Icons.Default.MicOff
+                        else -> Icons.Default.Mic
                     },
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("انصراف")
-                }
+                    contentDescription = "میکروفون",
+                    tint = when (state) {
+                        VoiceInputState.LISTENING -> MaterialTheme.colorScheme.primary
+                        VoiceInputState.RESULT_READY -> IncomeColor
+                        VoiceInputState.ERROR -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.size(36.dp)
+                )
             }
         },
         title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "ثبت با گفتار (صوتی)",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                IconButton(
-                    onClick = {
-                        speechManager.destroy()
-                        onDismissRequest()
-                    }
-                ) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "بستن")
-                }
-            }
+            Text(
+                text = "ثبت صوتی تراکنش",
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
         },
         text = {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (!speechManager.isAvailable()) {
-                    Icon(
-                        imageVector = Icons.Default.MicOff,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(54.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "تشخیص گفتار روی این دستگاه در دسترس نیست",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            showManualTypeDialog = true
+                // Status Text
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = when (state) {
+                        VoiceInputState.ERROR -> MaterialTheme.colorScheme.error
+                        VoiceInputState.LISTENING -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+
+                // Recognized text display
+                if (recognizedText.isNotBlank()) {
+                    OutlinedTextField(
+                        value = recognizedText,
+                        onValueChange = {
+                            recognizedText = it
+                            if (it.isNotBlank()) {
+                                parsedTransaction = VoiceTransactionParser.parse(it, categoryNames)
+                                state = VoiceInputState.RESULT_READY
+                            }
                         },
+                        label = { Text("متن گفتار") },
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
+                // Parsed preview card
+                parsedTransaction?.let { parsed ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     ) {
-                        Icon(imageVector = Icons.Default.Keyboard, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("تایپ دستی متن")
-                    }
-                } else if (permissionDeniedMessage != null) {
-                    Icon(
-                        imageVector = Icons.Default.MicOff,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(54.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = permissionDeniedMessage ?: "",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = {
-                                permissionDeniedMessage = null
-                                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                            },
-                            shape = RoundedCornerShape(12.dp)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text("اعطای مجوز")
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                showManualTypeDialog = true
-                            },
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("تایپ دستی")
-                        }
-                    }
-                } else {
-                    when (val currentVoiceState = voiceState) {
-                        is VoiceRecognitionState.Idle, is VoiceRecognitionState.Initializing -> {
-                            Box(
-                                modifier = Modifier
-                                    .size(76.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Mic,
-                                    contentDescription = "میکروفون",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(36.dp)
+                                Text(
+                                    text = "نوع تراکنش:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = if (parsed.type == TransactionType.EXPENSE) "هزینه" else "درآمد",
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (parsed.type == TransactionType.EXPENSE) ExpenseColor else IncomeColor
                                 )
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "در حال آماده‌سازی و اتصال به میکروفون...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                        }
 
-                        is VoiceRecognitionState.Listening -> {
-                            Box(
-                                modifier = Modifier
-                                    .size(86.dp)
-                                    .scale(pulseScale)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(60.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Mic,
-                                        contentDescription = "در حال گوش دادن",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "در حال شنیدن... صحبت کنید",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "مثال: «هزینه پنجاه هزار تومن خوراک» یا «واریز دو میلیون حقوق»",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                fontSize = 11.sp
-                            )
-                        }
-
-                        is VoiceRecognitionState.Processing -> {
-                            Box(
-                                modifier = Modifier
-                                    .size(76.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.secondaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Mic,
-                                    contentDescription = "پردازش صدا",
-                                    tint = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(36.dp)
+                                Text(
+                                    text = "مبلغ استخراجی:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = AmountFormatter.formatAmountWithCurrency(parsed.amount),
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "در حال پردازش گفتار...",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                            if (currentVoiceState.partialText.isNotBlank()) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Card(
+
+                            if (!parsed.suggestedCategoryName.isNullOrBlank()) {
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                    ),
-                                    shape = RoundedCornerShape(12.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = currentVoiceState.partialText,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.padding(12.dp),
-                                        textAlign = TextAlign.Center
+                                        text = "دسته‌بندی پیشنهادی:",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                }
-                            }
-                        }
-
-                        is VoiceRecognitionState.Success -> {
-                            Text(
-                                text = "متن دریافت شد:",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = currentVoiceState.recognizedText,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-
-                        is VoiceRecognitionState.Error -> {
-                            Icon(
-                                imageVector = Icons.Default.MicOff,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(54.dp)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = currentVoiceState.message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = {
-                                        speechManager.startListening()
-                                    },
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary
+                                    Text(
+                                        text = parsed.suggestedCategoryName,
+                                        fontWeight = FontWeight.Bold
                                     )
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = "تلاش مجدد"
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("تلاش مجدد")
-                                }
-
-                                OutlinedButton(
-                                    onClick = {
-                                        showManualTypeDialog = true
-                                    },
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(imageVector = Icons.Default.Keyboard, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("تایپ به جای گفتن")
                                 }
                             }
                         }
                     }
                 }
+
+                // Microphone Control Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (state == VoiceInputState.LISTENING) {
+                        Button(
+                            onClick = { stopListening() },
+                            colors = ButtonDefaults.buttonColors(containerColor = ExpenseColor),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("پایان صحبت")
+                        }
+                    } else {
+                        Button(
+                            onClick = { requestPermissionAndStart() },
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Mic, contentDescription = null)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (state == VoiceInputState.RESULT_READY) "تکرار ضبط" else "شروع گفتار")
+                        }
+                    }
+                }
+
+                // System Speech Recognizer Button (CRITICAL for older phones)
+                OutlinedButton(
+                    onClick = {
+                        stopListening()
+                        launchSystemSpeechIntent()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhoneAndroid,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("ورودی صوتی سیستم (گوگل / دیالوگ اندروید)", fontSize = 12.sp)
+                }
+
+                // Hints
+                Text(
+                    text = "نمونه: «هزینه پنجاه هزار تومن خوراک» یا «واریز دو میلیون حقوق»",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
             }
         },
-        shape = RoundedCornerShape(20.dp),
-        modifier = modifier
+        confirmButton = {
+            if (parsedTransaction != null && (parsedTransaction?.amount ?: 0L) > 0L) {
+                Button(
+                    onClick = {
+                        parsedTransaction?.let { onTransactionParsed(it) }
+                    },
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("تأیید و باز کردن فرم")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = {
+                    stopListening()
+                    onDismiss()
+                }
+            ) {
+                Text("انصراف")
+            }
+        }
     )
 }

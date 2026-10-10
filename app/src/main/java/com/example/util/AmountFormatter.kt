@@ -17,6 +17,8 @@ object AmountFormatter {
 
     fun formatRial(amount: Long): String = format(amount, includeCurrency = true)
 
+    fun formatAmountWithCurrency(amount: Long): String = format(amount, includeCurrency = true)
+
     fun formatWithSign(amount: Long, isExpense: Boolean): String {
         val formatted = format(amount, includeCurrency = true)
         return if (isExpense) {

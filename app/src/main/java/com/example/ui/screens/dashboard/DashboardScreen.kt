@@ -29,9 +29,6 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.MailOutline
-import androidx.compose.material.icons.filled.Mic
-import com.example.ui.components.VoiceInputDialog
-import com.example.util.VoiceDataHolder
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Remove
@@ -102,21 +99,8 @@ fun DashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val summary by viewModel.uiState.collectAsStateWithLifecycle()
-    val categories by viewModel.categories.collectAsStateWithLifecycle()
     var showMoreBottomSheet by remember { mutableStateOf(false) }
-    var showVoiceDialog by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
-
-    if (showVoiceDialog) {
-        VoiceInputDialog(
-            onDismissRequest = { showVoiceDialog = false },
-            categories = categories,
-            onVoiceParsed = { parsed ->
-                VoiceDataHolder.pendingVoiceTransaction = parsed
-                onNavigateToAddTransaction(parsed.type.name)
-            }
-        )
-    }
 
     if (showMoreBottomSheet) {
         ModalBottomSheet(
@@ -219,16 +203,7 @@ fun DashboardScreen(
                         },
                         modifier = Modifier.weight(1f)
                     )
-                    QuickAccessItem(
-                        title = "ثبت صوتی",
-                        icon = Icons.Default.Mic,
-                        color = Color(0xFF00897B),
-                        onClick = {
-                            showMoreBottomSheet = false
-                            showVoiceDialog = true
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
+                    Spacer(modifier = Modifier.weight(1f))
                 }
                 Spacer(modifier = Modifier.height(28.dp))
             }
@@ -253,21 +228,12 @@ fun DashboardScreen(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { showVoiceDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "ثبت صوتی",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "تنظیمات",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                IconButton(onClick = onNavigateToSettings) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "تنظیمات",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

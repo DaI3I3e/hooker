@@ -27,9 +27,11 @@ import kotlinx.coroutines.launch
         com.example.data.local.entity.ChequeEntity::class,
         com.example.data.local.entity.RecurringTransactionEntity::class,
         com.example.data.local.entity.SavingsGoalEntity::class,
-        com.example.data.local.entity.SavingsGoalEntryEntity::class
+        com.example.data.local.entity.SavingsGoalEntryEntity::class,
+        com.example.data.local.entity.GroupExpenseEntity::class,
+        com.example.data.local.entity.GroupExpenseShareEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class FinTrackDatabase : RoomDatabase() {
@@ -42,6 +44,7 @@ abstract class FinTrackDatabase : RoomDatabase() {
     abstract fun chequeDao(): com.example.data.local.dao.ChequeDao
     abstract fun recurringDao(): com.example.data.local.dao.RecurringDao
     abstract fun savingsGoalDao(): com.example.data.local.dao.SavingsGoalDao
+    abstract fun groupExpenseDao(): com.example.data.local.dao.GroupExpenseDao
 
     companion object {
         @Volatile
@@ -183,6 +186,36 @@ abstract class FinTrackDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `group_expenses` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `transactionId` INTEGER NOT NULL,
+                        `shareMode` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_group_expenses_transactionId` ON `group_expenses` (`transactionId`)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `group_expense_shares` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `groupExpenseId` INTEGER NOT NULL,
+                        `personName` TEXT NOT NULL,
+                        `amount` INTEGER NOT NULL,
+                        `isSettled` INTEGER NOT NULL,
+                        `settledTransactionId` INTEGER,
+                        FOREIGN KEY(`groupExpenseId`) REFERENCES `group_expenses`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`settledTransactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_group_expense_shares_groupExpenseId` ON `group_expense_shares` (`groupExpenseId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_group_expense_shares_settledTransactionId` ON `group_expense_shares` (`settledTransactionId`)")
+            }
+        }
+
         fun getInstance(context: Context): FinTrackDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -190,7 +223,7 @@ abstract class FinTrackDatabase : RoomDatabase() {
                     FinTrackDatabase::class.java,
                     Constants.DATABASE_NAME
                 )
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 .build()
                 INSTANCE = instance
                 instance

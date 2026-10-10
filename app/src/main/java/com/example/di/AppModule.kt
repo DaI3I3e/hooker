@@ -72,6 +72,10 @@ class AppModule(private val context: Context) {
         com.example.data.repository.SavingsGoalRepository(database.savingsGoalDao(), database)
     }
 
+    val groupExpenseRepository: com.example.data.repository.GroupExpenseRepository by lazy {
+        com.example.data.repository.GroupExpenseRepository(database)
+    }
+
     val addTransactionUseCase: AddTransactionUseCase by lazy {
         AddTransactionUseCase(transactionRepository)
     }

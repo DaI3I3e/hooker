@@ -6,17 +6,28 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.local.entity.AccountEntity
 import com.example.data.local.entity.CategoryEntity
 import com.example.data.local.entity.CategoryType
+import com.example.data.local.entity.GroupExpenseShareMode
 import com.example.data.local.entity.TransactionEntity
 import com.example.data.local.entity.TransactionType
 import com.example.data.repository.AccountRepository
 import com.example.data.repository.CategoryRepository
+import com.example.data.repository.GroupExpenseRepository
 import com.example.data.repository.SettingsRepository
 import com.example.domain.usecase.AddTransactionUseCase
+import com.example.util.AmountFormatter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
+
+data class GroupShareInput(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val amount: Long = 0L
+)
 
 data class AddTransactionUiState(
     val type: TransactionType = TransactionType.EXPENSE,
@@ -33,8 +44,11 @@ data class AddTransactionUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val isSuccess: Boolean = false,
-    val voiceBannerMessage: String? = null,
-    val voiceRecognizedText: String? = null
+    // Group Expense (Dong)
+    val isGroupExpenseEnabled: Boolean = false,
+    val groupShareMode: GroupExpenseShareMode = GroupExpenseShareMode.EQUAL,
+    val groupShares: List<GroupShareInput> = emptyList(),
+    val recentPersonNames: List<String> = emptyList()
 )
 
 class AddTransactionViewModel(
@@ -42,7 +56,8 @@ class AddTransactionViewModel(
     private val accountRepository: AccountRepository,
     private val categoryRepository: CategoryRepository,
     private val settingsRepository: SettingsRepository,
-    private val addTransactionUseCase: AddTransactionUseCase
+    private val addTransactionUseCase: AddTransactionUseCase,
+    private val groupExpenseRepository: GroupExpenseRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -64,6 +79,7 @@ class AddTransactionViewModel(
         viewModelScope.launch {
             val accounts = accountRepository.allAccounts.firstOrNull() ?: emptyList()
             val categories = categoryRepository.allCategories.firstOrNull() ?: emptyList()
+            val recentNames = groupExpenseRepository.recentPersonNames.firstOrNull() ?: emptyList()
 
             val lastAccId = settingsRepository.lastAccountId
             val lastCatId = settingsRepository.lastCategoryId
@@ -80,13 +96,16 @@ class AddTransactionViewModel(
             }
             val defaultCategory = filteredCategories.find { it.id == preferredCatId } ?: filteredCategories.firstOrNull()
 
-            _uiState.value = _uiState.value.copy(
-                accounts = accounts,
-                categories = filteredCategories,
-                selectedAccount = defaultAccount,
-                selectedToAccount = defaultToAccount,
-                selectedCategory = defaultCategory
-            )
+            _uiState.update {
+                it.copy(
+                    accounts = accounts,
+                    categories = filteredCategories,
+                    selectedAccount = defaultAccount,
+                    selectedToAccount = defaultToAccount,
+                    selectedCategory = defaultCategory,
+                    recentPersonNames = recentNames
+                )
+            }
         }
     }
 
@@ -103,119 +122,195 @@ class AddTransactionViewModel(
                 ?: filtered.find { it.id == _uiState.value.selectedCategory?.id }
                 ?: filtered.firstOrNull()
 
-            _uiState.value = _uiState.value.copy(
-                type = type,
-                categories = filtered,
-                selectedCategory = selectedCat
-            )
-        }
-    }
-
-    fun prefillFromVoice(parsed: com.example.util.ParsedVoiceTransaction) {
-        viewModelScope.launch {
-            val allCats = categoryRepository.allCategories.firstOrNull() ?: emptyList()
-            val accounts = accountRepository.allAccounts.firstOrNull() ?: emptyList()
-
-            val lastAccId = settingsRepository.lastAccountId
-            val defaultAccount = accounts.find { it.id == lastAccId } ?: accounts.firstOrNull()
-
-            val type = parsed.type
-            val filteredCats = filterCategories(allCats, type)
-            val matchedCat = parsed.guessedCategory?.let { guessed ->
-                filteredCats.find { it.id == guessed.id || it.name == guessed.name }
-            } ?: filteredCats.firstOrNull()
-
-            var banner: String? = null
-            if (parsed.amountRial != null) {
-                if (parsed.isTomanDetected && parsed.tomanAmount != null) {
-                    val tomanFormatted = com.example.util.AmountFormatter.format(parsed.tomanAmount, includeCurrency = false)
-                    val rialFormatted = com.example.util.AmountFormatter.format(parsed.amountRial)
-                    banner = "مبلغ از گفتار: $tomanFormatted تومان = $rialFormatted"
-                } else {
-                    val rialFormatted = com.example.util.AmountFormatter.format(parsed.amountRial)
-                    banner = "مبلغ استخراج‌شده: $rialFormatted"
-                }
+            _uiState.update {
+                it.copy(
+                    type = type,
+                    categories = filtered,
+                    selectedCategory = selectedCat,
+                    // Disable group expense if switching away from EXPENSE
+                    isGroupExpenseEnabled = if (type == TransactionType.EXPENSE) it.isGroupExpenseEnabled else false
+                )
             }
-
-            _uiState.value = _uiState.value.copy(
-                type = type,
-                amount = parsed.amountRial ?: _uiState.value.amount,
-                accounts = accounts,
-                categories = filteredCats,
-                selectedAccount = _uiState.value.selectedAccount ?: defaultAccount,
-                selectedCategory = matchedCat ?: _uiState.value.selectedCategory,
-                note = parsed.recognizedText.ifBlank { _uiState.value.note },
-                voiceBannerMessage = banner,
-                voiceRecognizedText = parsed.recognizedText
-            )
         }
-    }
-
-    fun dismissVoiceBanner() {
-        _uiState.value = _uiState.value.copy(voiceBannerMessage = null)
     }
 
     fun setAmount(amount: Long) {
-        _uiState.value = _uiState.value.copy(amount = amount, errorMessage = null)
+        _uiState.update { current ->
+            val updatedShares = if (current.isGroupExpenseEnabled && current.groupShareMode == GroupExpenseShareMode.EQUAL && current.groupShares.isNotEmpty()) {
+                recalculateEqualShares(current.groupShares, amount)
+            } else current.groupShares
+
+            current.copy(
+                amount = amount,
+                groupShares = updatedShares,
+                errorMessage = null
+            )
+        }
     }
 
     fun setSelectedAccount(account: AccountEntity) {
-        _uiState.value = _uiState.value.copy(selectedAccount = account)
+        _uiState.update { it.copy(selectedAccount = account) }
     }
 
     fun setSelectedToAccount(account: AccountEntity) {
-        _uiState.value = _uiState.value.copy(selectedToAccount = account)
+        _uiState.update { it.copy(selectedToAccount = account) }
     }
 
     fun setSelectedCategory(category: CategoryEntity) {
-        _uiState.value = _uiState.value.copy(selectedCategory = category)
+        _uiState.update { it.copy(selectedCategory = category) }
     }
 
     fun setDateTimestamp(timestamp: Long) {
         val hour = _uiState.value.selectedHour
         val minute = _uiState.value.selectedMinute
         val combined = com.example.util.DateFormatter.combineDateAndTime(timestamp, hour, minute)
-        _uiState.value = _uiState.value.copy(dateTimestamp = combined)
+        _uiState.update { it.copy(dateTimestamp = combined) }
     }
 
     fun setTime(hour: Int, minute: Int) {
         val combined = com.example.util.DateFormatter.combineDateAndTime(_uiState.value.dateTimestamp, hour, minute)
-        _uiState.value = _uiState.value.copy(
-            selectedHour = hour,
-            selectedMinute = minute,
-            dateTimestamp = combined
-        )
+        _uiState.update {
+            it.copy(
+                selectedHour = hour,
+                selectedMinute = minute,
+                dateTimestamp = combined
+            )
+        }
     }
 
     fun setNote(note: String) {
-        _uiState.value = _uiState.value.copy(note = note)
+        _uiState.update { it.copy(note = note) }
+    }
+
+    // --- Group Expense (Dong) Functions ---
+    fun setGroupExpenseEnabled(enabled: Boolean) {
+        _uiState.update { current ->
+            val updatedShares = if (enabled && current.groupShareMode == GroupExpenseShareMode.EQUAL && current.groupShares.isNotEmpty() && current.amount > 0) {
+                recalculateEqualShares(current.groupShares, current.amount)
+            } else current.groupShares
+
+            current.copy(
+                isGroupExpenseEnabled = enabled,
+                groupShares = updatedShares
+            )
+        }
+    }
+
+    fun setGroupShareMode(mode: GroupExpenseShareMode) {
+        _uiState.update { current ->
+            val updatedShares = if (mode == GroupExpenseShareMode.EQUAL && current.groupShares.isNotEmpty() && current.amount > 0) {
+                recalculateEqualShares(current.groupShares, current.amount)
+            } else current.groupShares
+
+            current.copy(
+                groupShareMode = mode,
+                groupShares = updatedShares,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun addGroupPerson(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return
+
+        _uiState.update { current ->
+            if (current.groupShares.any { it.name.equals(trimmed, ignoreCase = true) }) {
+                return@update current
+            }
+            val newList = current.groupShares + GroupShareInput(name = trimmed)
+            val updated = if (current.groupShareMode == GroupExpenseShareMode.EQUAL && current.amount > 0) {
+                recalculateEqualShares(newList, current.amount)
+            } else newList
+
+            current.copy(groupShares = updated, errorMessage = null)
+        }
+    }
+
+    fun removeGroupPerson(id: String) {
+        _uiState.update { current ->
+            val newList = current.groupShares.filterNot { it.id == id }
+            val updated = if (current.groupShareMode == GroupExpenseShareMode.EQUAL && current.amount > 0 && newList.isNotEmpty()) {
+                recalculateEqualShares(newList, current.amount)
+            } else newList
+
+            current.copy(groupShares = updated, errorMessage = null)
+        }
+    }
+
+    fun updateGroupPersonAmount(id: String, amount: Long) {
+        _uiState.update { current ->
+            val newList = current.groupShares.map {
+                if (it.id == id) it.copy(amount = amount) else it
+            }
+            current.copy(groupShares = newList, errorMessage = null)
+        }
+    }
+
+    private fun recalculateEqualShares(shares: List<GroupShareInput>, totalAmount: Long): List<GroupShareInput> {
+        if (shares.isEmpty()) return shares
+        val count = shares.size
+        val baseShare = totalAmount / count
+        val remainder = totalAmount % count
+
+        return shares.mapIndexed { index, item ->
+            // First person receives remainder to strictly ensure sum equals total amount (exact Rial)
+            val amount = if (index == 0) baseShare + remainder else baseShare
+            item.copy(amount = amount)
+        }
     }
 
     fun saveTransaction() {
         val state = _uiState.value
         if (state.amount <= 0L) {
-            _uiState.value = state.copy(errorMessage = "لطفاً مبلغ معتبری وارد کنید")
+            _uiState.update { it.copy(errorMessage = "لطفاً مبلغ معتبری وارد کنید") }
             return
         }
         if (state.selectedAccount == null) {
-            _uiState.value = state.copy(errorMessage = "لطفاً حساب مبدا را انتخاب کنید")
+            _uiState.update { it.copy(errorMessage = "لطفاً حساب مبدا را انتخاب کنید") }
             return
         }
         if (state.type == TransactionType.TRANSFER && state.selectedToAccount == null) {
-            _uiState.value = state.copy(errorMessage = "لطفاً حساب مقصد را انتخاب کنید")
+            _uiState.update { it.copy(errorMessage = "لطفاً حساب مقصد را انتخاب کنید") }
             return
         }
         if (state.type == TransactionType.TRANSFER && state.selectedAccount.id == state.selectedToAccount?.id) {
-            _uiState.value = state.copy(errorMessage = "حساب مبدا و مقصد نمی‌توانند یکسان باشند")
+            _uiState.update { it.copy(errorMessage = "حساب مبدا و مقصد نمی‌توانند یکسان باشند") }
             return
         }
         if (state.type != TransactionType.TRANSFER && state.selectedCategory == null) {
-            _uiState.value = state.copy(errorMessage = "لطفاً دسته‌بندی را انتخاب کنید")
+            _uiState.update { it.copy(errorMessage = "لطفاً دسته‌بندی را انتخاب کنید") }
             return
         }
 
+        // Validate Group Expense
+        if (state.type == TransactionType.EXPENSE && state.isGroupExpenseEnabled) {
+            if (state.groupShares.isEmpty()) {
+                _uiState.update { it.copy(errorMessage = "لطفاً حداقل نام یک نفر را برای هزینه مشترک وارد کنید") }
+                return
+            }
+            if (state.groupShares.any { it.name.isBlank() }) {
+                _uiState.update { it.copy(errorMessage = "نام تمام افراد در هزینه مشترک باید مشخص باشد") }
+                return
+            }
+            if (state.groupShareMode == GroupExpenseShareMode.CUSTOM) {
+                val sumShares = state.groupShares.sumOf { it.amount }
+                if (sumShares != state.amount) {
+                    val diff = kotlin.math.abs(state.amount - sumShares)
+                    val diffText = AmountFormatter.formatAmountWithCurrency(diff)
+                    val msg = if (sumShares < state.amount) {
+                        "مجموع سهم‌ها کمتر از کل مبلغ است ($diffText کسری)"
+                    } else {
+                        "مجموع سهم‌ها بیشتر از کل مبلغ است ($diffText مازاد)"
+                    }
+                    _uiState.update { it.copy(errorMessage = msg) }
+                    return
+                }
+            }
+        }
+
         viewModelScope.launch {
-            _uiState.value = state.copy(isLoading = true, errorMessage = null)
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             val finalTimestamp = com.example.util.DateFormatter.combineDateAndTime(
                 state.dateTimestamp,
@@ -234,7 +329,20 @@ class AddTransactionViewModel(
             )
 
             val result = addTransactionUseCase(transaction)
-            result.onSuccess {
+            result.onSuccess { txId ->
+                // If group expense was enabled, save shares
+                if (state.type == TransactionType.EXPENSE && state.isGroupExpenseEnabled && state.groupShares.isNotEmpty()) {
+                    val finalShares = if (state.groupShareMode == GroupExpenseShareMode.EQUAL) {
+                        recalculateEqualShares(state.groupShares, state.amount)
+                    } else state.groupShares
+
+                    groupExpenseRepository.saveGroupExpense(
+                        transactionId = txId,
+                        shareMode = state.groupShareMode,
+                        shares = finalShares.map { it.name to it.amount }
+                    )
+                }
+
                 settingsRepository.lastAccountId = state.selectedAccount.id
                 state.selectedCategory?.let { cat ->
                     settingsRepository.lastCategoryId = cat.id
@@ -244,12 +352,14 @@ class AddTransactionViewModel(
                         settingsRepository.lastIncomeCategoryId = cat.id
                     }
                 }
-                _uiState.value = _uiState.value.copy(isLoading = false, isSuccess = true)
+                _uiState.update { it.copy(isLoading = false, isSuccess = true) }
             }.onFailure { ex ->
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = ex.message ?: "خطا در ثبت تراکنش"
-                )
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = ex.message ?: "خطا در ثبت تراکنش"
+                    )
+                }
             }
         }
     }
@@ -267,7 +377,8 @@ class AddTransactionViewModel(
         private val accountRepository: AccountRepository,
         private val categoryRepository: CategoryRepository,
         private val settingsRepository: SettingsRepository,
-        private val addTransactionUseCase: AddTransactionUseCase
+        private val addTransactionUseCase: AddTransactionUseCase,
+        private val groupExpenseRepository: GroupExpenseRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -276,7 +387,8 @@ class AddTransactionViewModel(
                 accountRepository,
                 categoryRepository,
                 settingsRepository,
-                addTransactionUseCase
+                addTransactionUseCase,
+                groupExpenseRepository
             ) as T
         }
     }

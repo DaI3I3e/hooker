@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,6 +20,19 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import com.example.data.local.entity.GroupExpenseShareMode
+import com.example.util.AmountFormatter
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -46,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -61,12 +74,6 @@ import com.example.ui.theme.TransferColor
 import com.example.util.DateFormatter
 import java.util.Calendar
 
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import com.example.util.VoiceDataHolder
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTransactionScreen(
@@ -79,13 +86,6 @@ fun AddTransactionScreen(
     val context = LocalContext.current
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        VoiceDataHolder.pendingVoiceTransaction?.let { pending ->
-            viewModel.prefillFromVoice(pending)
-            VoiceDataHolder.clear()
-        }
-    }
 
     if (showDatePicker) {
         com.example.ui.components.JalaliDatePickerDialog(
@@ -147,54 +147,6 @@ fun AddTransactionScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Voice Input Info Banner
-            state.voiceBannerMessage?.let { banner ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = banner,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            state.voiceRecognizedText?.let { rawText ->
-                                Text(
-                                    text = "متن گفتار: «$rawText»",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                )
-                            }
-                        }
-                        IconButton(onClick = { viewModel.dismissVoiceBanner() }) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "بستن",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-            }
-
             // Transaction Type Tabs
             val selectedTabIndex = when (state.type) {
                 TransactionType.EXPENSE -> 0
@@ -379,6 +331,269 @@ fun AddTransactionScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp)
             )
+
+            // Group Expense (Dong) Section - Only for EXPENSE
+            if (state.type == TransactionType.EXPENSE) {
+                var newPersonName by remember { mutableStateOf("") }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (state.isGroupExpenseEnabled)
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Group,
+                                    contentDescription = null,
+                                    tint = if (state.isGroupExpenseEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "هزینه مشترک (دنگ)",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "تقسیم مبلغ بین افراد و ثبت طلب",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = state.isGroupExpenseEnabled,
+                                onCheckedChange = { viewModel.setGroupExpenseEnabled(it) }
+                            )
+                        }
+
+                        if (state.isGroupExpenseEnabled) {
+                            // Mode Selection Tabs
+                            TabRow(
+                                selectedTabIndex = if (state.groupShareMode == GroupExpenseShareMode.EQUAL) 0 else 1,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                            ) {
+                                Tab(
+                                    selected = state.groupShareMode == GroupExpenseShareMode.EQUAL,
+                                    onClick = { viewModel.setGroupShareMode(GroupExpenseShareMode.EQUAL) },
+                                    text = { Text("تقسیم مساوی") }
+                                )
+                                Tab(
+                                    selected = state.groupShareMode == GroupExpenseShareMode.CUSTOM,
+                                    onClick = { viewModel.setGroupShareMode(GroupExpenseShareMode.CUSTOM) },
+                                    text = { Text("سهم دلخواه") }
+                                )
+                            }
+
+                            // Add Person Input
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = newPersonName,
+                                    onValueChange = { newPersonName = it },
+                                    modifier = Modifier.weight(1f),
+                                    placeholder = { Text("نام دوست یا هم‌سفر...") },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                Button(
+                                    onClick = {
+                                        if (newPersonName.isNotBlank()) {
+                                            viewModel.addGroupPerson(newPersonName)
+                                            newPersonName = ""
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Default.Add, contentDescription = "افزودن")
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("افزودن")
+                                }
+                            }
+
+                            // Suggested Names Chips (from previous dongs)
+                            val availableSuggestions = state.recentPersonNames.filter { name ->
+                                state.groupShares.none { it.name.equals(name, ignoreCase = true) }
+                            }
+                            if (availableSuggestions.isNotEmpty()) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = "افراد پیشنهادی اخیر:",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        items(availableSuggestions) { name ->
+                                            AssistChip(
+                                                onClick = { viewModel.addGroupPerson(name) },
+                                                label = { Text(name) },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Person,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // List of Added Persons
+                            if (state.groupShares.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "هنوز فردی به هزینه مشترک اضافه نشده است.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    state.groupShares.forEachIndexed { index, person ->
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Person,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Column {
+                                                        Text(
+                                                            text = person.name,
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                        if (state.groupShareMode == GroupExpenseShareMode.EQUAL) {
+                                                            Text(
+                                                                text = AmountFormatter.formatAmountWithCurrency(person.amount),
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                color = MaterialTheme.colorScheme.primary
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                // If CUSTOM mode, editable amount field
+                                                if (state.groupShareMode == GroupExpenseShareMode.CUSTOM) {
+                                                    OutlinedTextField(
+                                                        value = if (person.amount > 0) person.amount.toString() else "",
+                                                        onValueChange = { input ->
+                                                            val clean = input.filter { it.isDigit() }
+                                                            val num = clean.toLongOrNull() ?: 0L
+                                                            viewModel.updateGroupPersonAmount(person.id, num)
+                                                        },
+                                                        modifier = Modifier.width(130.dp),
+                                                        placeholder = { Text("مبلغ ریال") },
+                                                        singleLine = true,
+                                                        shape = RoundedCornerShape(8.dp)
+                                                    )
+                                                }
+
+                                                IconButton(
+                                                    onClick = { viewModel.removeGroupPerson(person.id) }
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Delete,
+                                                        contentDescription = "حذف فرد",
+                                                        tint = MaterialTheme.colorScheme.error
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // In CUSTOM mode, check total sum vs transaction amount
+                                if (state.groupShareMode == GroupExpenseShareMode.CUSTOM) {
+                                    val sumShares = state.groupShares.sumOf { it.amount }
+                                    val diff = state.amount - sumShares
+                                    if (diff != 0L) {
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(10.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = if (diff > 0) "کسری سهم‌ها:" else "مازاد سهم‌ها:",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    text = AmountFormatter.formatAmountWithCurrency(kotlin.math.abs(diff)),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        Text(
+                                            text = "مجموع سهم‌ها با کل مبلغ هزینه برابر است ✓",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 

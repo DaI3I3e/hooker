@@ -60,7 +60,7 @@ class AddAccountViewModel(
                     icon = acc.icon,
                     cardNumber = acc.cardNumber ?: "",
                     shabaNumber = acc.shabaNumber ?: "",
-                    cardExpiry = acc.cardExpiry?.filter { it.isDigit() }?.take(4) ?: "",
+                    cardExpiry = acc.cardExpiry ?: "",
                     logoResName = acc.logoResName,
                     logoImage = acc.logoImage,
                     isNoLogo = !hasAnyLogo && acc.logoResName == null,
@@ -165,13 +165,6 @@ class AddAccountViewModel(
 
             val finalImage = if (state.isNoLogo) null else state.logoImage
 
-            val formattedExpiry = when {
-                state.cardExpiry.isBlank() -> null
-                state.cardExpiry.length == 4 && !state.cardExpiry.contains('/') ->
-                    "${state.cardExpiry.take(2)}/${state.cardExpiry.takeLast(2)}"
-                else -> state.cardExpiry.trim().ifBlank { null }
-            }
-
             val account = AccountEntity(
                 id = state.accountId ?: 0L,
                 name = state.name.trim(),
@@ -181,7 +174,7 @@ class AddAccountViewModel(
                 icon = state.icon,
                 cardNumber = state.cardNumber.ifBlank { null },
                 shabaNumber = state.shabaNumber.ifBlank { null },
-                cardExpiry = formattedExpiry,
+                cardExpiry = state.cardExpiry.ifBlank { null },
                 logoResName = finalLogo,
                 logoImage = finalImage,
                 createdAt = now,

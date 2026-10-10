@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Repeat
@@ -48,6 +49,7 @@ fun MoreScreen(
     onNavigateToAccounts: () -> Unit,
     onNavigateToCategories: () -> Unit,
     onNavigateToDebts: () -> Unit,
+    onNavigateToGroupExpenses: () -> Unit = {},
     onNavigateToRecurring: () -> Unit = {},
     onNavigateToSavingsGoals: () -> Unit = {},
     onNavigateToCheques: () -> Unit = {},
@@ -92,6 +94,14 @@ fun MoreScreen(
                 icon = Icons.Default.Receipt,
                 iconColor = MaterialTheme.colorScheme.tertiary,
                 onClick = onNavigateToDebts
+            )
+
+            MoreMenuItem(
+                title = "هزینه‌های مشترک (دنگ)",
+                subtitle = "پیگیری دنگ‌های سفر و دورهمی، تسویه و اشتراک‌گذاری",
+                icon = Icons.Default.Groups,
+                iconColor = MaterialTheme.colorScheme.primary,
+                onClick = onNavigateToGroupExpenses
             )
 
             MoreMenuItem(

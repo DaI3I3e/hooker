@@ -45,7 +45,6 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -97,7 +96,8 @@ fun SettingsScreen(
     var showPasteJsonDialog by remember { mutableStateOf(false) }
     var jsonInputText by remember { mutableStateOf("") }
     var showExportOptionsDialog by remember { mutableStateOf(false) }
-    var showPlainJsonWarningDialog by remember { mutableStateOf(false) }
+    var showPlainWarningDialog by remember { mutableStateOf(false) }
+    var showPlainExportOptionsDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.userMessage) {
         state.userMessage?.let { msg ->
@@ -107,18 +107,18 @@ fun SettingsScreen(
     }
 
     // Document Creator Launcher for Exporting Encrypted Backup (.ftb)
-    val createDocumentLauncher = rememberLauncherForActivityResult(
+    val createFtbDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
         uri?.let { destinationUri ->
             coroutineScope.launch(Dispatchers.IO) {
                 try {
-                    val encryptedBytes = viewModel.generateBackupEncryptedBytes()
+                    val bytes = viewModel.generateEncryptedBackup()
                     context.contentResolver.openOutputStream(destinationUri)?.use { outputStream ->
-                        outputStream.write(encryptedBytes)
+                        outputStream.write(bytes)
                     }
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "فایل پشتیبان رمزنگاری‌شده (.ftb) در حافظه ذخیره شد", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "فایل پشتیبان امن (.ftb) ذخیره شد", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
@@ -129,19 +129,19 @@ fun SettingsScreen(
         }
     }
 
-    // Document Creator Launcher for Exporting Portable Plain JSON Backup (.json)
+    // Document Creator Launcher for Exporting Plain Backup (.json)
     val createJsonDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         uri?.let { destinationUri ->
             coroutineScope.launch(Dispatchers.IO) {
                 try {
-                    val json = viewModel.generateBackupJson()
+                    val jsonContent = viewModel.generatePlainBackupJson()
                     context.contentResolver.openOutputStream(destinationUri)?.use { outputStream ->
-                        outputStream.write(json.toByteArray(Charsets.UTF_8))
+                        outputStream.write(jsonContent.toByteArray(Charsets.UTF_8))
                     }
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "فایل بکاپ قابل حمل (JSON) ذخیره شد", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "فایل پشتیبان JSON در حافظه ذخیره شد", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
@@ -164,7 +164,7 @@ fun SettingsScreen(
                     }
                     withContext(Dispatchers.Main) {
                         if (bytes != null && bytes.isNotEmpty()) {
-                            viewModel.onFileSelectedForRestore(bytes)
+                            viewModel.onBytesSelectedForRestore(bytes)
                         } else {
                             Toast.makeText(context, "فایل انتخاب‌شده خالی است", Toast.LENGTH_SHORT).show()
                         }
@@ -378,21 +378,11 @@ fun SettingsScreen(
                                             fontWeight = FontWeight.Bold
                                         )
                                         if (!acc.cardNumber.isNullOrBlank()) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
-                                                    text = "کارت: ",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                                Text(
-                                                    text = com.example.util.CardDisplayUtils.formatMaskedCard(acc.cardNumber),
-                                                    style = MaterialTheme.typography.bodySmall.copy(
-                                                        textDirection = androidx.compose.ui.text.style.TextDirection.Ltr,
-                                                        textAlign = androidx.compose.ui.text.style.TextAlign.Start
-                                                    ),
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
+                                            Text(
+                                                text = "کارت: ${acc.cardNumber.takeLast(4)}****".toPersianDigits(),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
                                         }
                                     }
                                 }
@@ -473,7 +463,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("📂 انتخاب فایل پشتیبان (.ftb یا .json)")
+                        Text("📂 انتخاب فایل (.ftb یا .json) از حافظه")
                     }
 
                     OutlinedButton(
@@ -485,7 +475,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("📋 وارد کردن مستقیم متن بکآپ")
+                        Text("📋 وارد کردن مستقیم متن فایل (JSON یا رمزشده)")
                     }
                 }
             },
@@ -498,7 +488,7 @@ fun SettingsScreen(
         )
     }
 
-    // Dialog for Manual JSON Input
+    // Dialog for Manual JSON / Encrypted Text Input
     if (showPasteJsonDialog) {
         AlertDialog(
             onDismissRequest = { showPasteJsonDialog = false },
@@ -514,7 +504,7 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "محتوای فایل JSON پشتیبان جیب‌بان را در کادر زیر جای‌گذاری کنید:",
+                        text = "محتوای فایل JSON یا متن رمزنگاری‌شده پشتیبان را در کادر زیر جای‌گذاری کنید:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -524,8 +514,8 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(180.dp),
-                        label = { Text("متن پشتیبان (JSON)") },
-                        placeholder = { Text("{\"accounts\": [...], ...}") },
+                        label = { Text("متن پشتیبان (.json یا Base64 .ftb)") },
+                        placeholder = { Text("{\"accounts\": [...]} یا متن رمزشده") },
                         shape = RoundedCornerShape(10.dp)
                     )
                 }
@@ -536,7 +526,7 @@ fun SettingsScreen(
                         val text = jsonInputText.trim()
                         if (text.isNotBlank()) {
                             showPasteJsonDialog = false
-                            viewModel.onFileSelectedForRestore(text)
+                            viewModel.onTextSelectedForRestore(text)
                         } else {
                             Toast.makeText(context, "لطفاً متن فایل پشتیبان را وارد کنید", Toast.LENGTH_SHORT).show()
                         }
@@ -554,7 +544,7 @@ fun SettingsScreen(
         )
     }
 
-    // Dialog for Export Options
+    // Dialog for Export Options (Dual Mode: Encrypted vs Portable JSON)
     if (showExportOptionsDialog) {
         AlertDialog(
             onDismissRequest = { showExportOptionsDialog = false },
@@ -576,103 +566,121 @@ fun SettingsScreen(
             text = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Text(
-                        text = "روش ذخیره‌سازی نسخه پشتیبان را انتخاب کنید:",
+                        text = "نوع نسخه پشتیبان را انتخاب کنید:",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Button(
-                        onClick = {
-                            showExportOptionsDialog = false
-                            try {
-                                val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                                val defaultFileName = "jeebban_backup_$timestamp.ftb"
-                                createDocumentLauncher.launch(defaultFileName)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "برنامه ذخیره فایل در دسترس نیست: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                        },
+                    // Option 1: Encrypted Secure Backup (.ftb)
+                    Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
                     ) {
-                        Text("🔒 بک‌آپ امن (رمزنگاری‌شده، .ftb)")
-                    }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "🔒 بک‌آپ امن (رمزنگاری‌شده) (.ftb)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "رمزگذاری شده با کلید امن Keystore. مخصوص استفاده روزمره روی همین دستگاه.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
 
-                    OutlinedButton(
-                        onClick = {
-                            showExportOptionsDialog = false
-                            showPlainJsonWarningDialog = true
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("📄 بک‌آپ قابل حمل (بدون رمزنگاری، JSON)")
-                    }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        showExportOptionsDialog = false
+                                        try {
+                                            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                                            createFtbDocumentLauncher.launch("jeebban_backup_$timestamp.ftb")
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "خطا در باز کردن ذخیره‌ساز: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("💾 ذخیره فایل")
+                                }
 
-                    OutlinedButton(
-                        onClick = {
-                            showExportOptionsDialog = false
-                            coroutineScope.launch {
-                                try {
-                                    val json = viewModel.generateBackupJson()
-                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                                    val clip = android.content.ClipData.newPlainText("JeebBan Backup Raw JSON", json)
-                                    clipboard?.setPrimaryClip(clip)
-                                    Toast.makeText(context, "متن خام بدون رمزنگاری در حافظه موقت (کلیپ‌بورد) کپی شد", Toast.LENGTH_LONG).show()
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "خطا در کپی: ${e.message}", Toast.LENGTH_SHORT).show()
+                                OutlinedButton(
+                                    onClick = {
+                                        showExportOptionsDialog = false
+                                        coroutineScope.launch {
+                                            try {
+                                                val encrypted = viewModel.generateEncryptedBackup()
+                                                val b64 = com.example.data.backup.BackupCrypto.bytesToBase64(encrypted)
+                                                val sendIntent = android.content.Intent().apply {
+                                                    action = android.content.Intent.ACTION_SEND
+                                                    putExtra(android.content.Intent.EXTRA_TEXT, b64)
+                                                    type = "text/plain"
+                                                }
+                                                val shareIntent = android.content.Intent.createChooser(sendIntent, "اشتراک‌گذاری بک‌آپ امن (.ftb)")
+                                                context.startActivity(shareIntent)
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "خطا در اشتراک‌گذاری: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("📤 اشتراک‌گذاری")
                                 }
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("📋 کپی متن خام (بدون رمزنگاری)")
+                        }
                     }
 
-                    OutlinedButton(
-                        onClick = {
-                            showExportOptionsDialog = false
-                            coroutineScope.launch(Dispatchers.IO) {
-                                try {
-                                    val encryptedBytes = viewModel.generateBackupEncryptedBytes()
-                                    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                                    val fileName = "jeebban_backup_$timestamp.ftb"
-                                    val cachePath = java.io.File(context.cacheDir, "backups")
-                                    cachePath.mkdirs()
-                                    val file = java.io.File(cachePath, fileName)
-                                    file.writeBytes(encryptedBytes)
-
-                                    val fileUri: android.net.Uri = androidx.core.content.FileProvider.getUriForFile(
-                                        context,
-                                        "${context.packageName}.fileprovider",
-                                        file
-                                    )
-
-                                    val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                        type = "application/octet-stream"
-                                        putExtra(android.content.Intent.EXTRA_STREAM, fileUri)
-                                        putExtra(android.content.Intent.EXTRA_SUBJECT, "نسخه پشتیبان رمزنگاری‌شده جیب‌بان")
-                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    val shareIntent = android.content.Intent.createChooser(sendIntent, "اشتراک‌گذاری نسخه پشتیبان رمزنگاری‌شده")
-                                    withContext(Dispatchers.Main) {
-                                        context.startActivity(shareIntent)
-                                    }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        Toast.makeText(context, "خطا در اشتراک‌گذاری: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                        },
+                    // Option 2: Portable Plain JSON
+                    Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     ) {
-                        Text("📤 اشتراک‌گذاری فایل رمزنگاری‌شده (.ftb)")
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "📄 بک‌آپ قابل حمل (بدون رمزنگاری، JSON)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "مناسب برای انتقال به گوشی دیگر یا حفظ اطلاعات در صورت حذف و نصب مجدد اپلیکیشن.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Button(
+                                onClick = {
+                                    showExportOptionsDialog = false
+                                    showPlainWarningDialog = true
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("انتخاب بک‌آپ قابل حمل...")
+                            }
+                        }
                     }
                 }
             },
@@ -685,59 +693,133 @@ fun SettingsScreen(
         )
     }
 
-    // Warning Dialog for Plain Portable JSON Backup
-    if (showPlainJsonWarningDialog) {
+    // Warning Dialog for Plain Portable Backup (MANDATORY REQUIREMENT)
+    if (showPlainWarningDialog) {
         AlertDialog(
-            onDismissRequest = { showPlainJsonWarningDialog = false },
+            onDismissRequest = { showPlainWarningDialog = false },
             icon = {
                 Icon(
                     imageVector = Icons.Default.Warning,
                     contentDescription = null,
-                    tint = ExpenseColor,
+                    tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(36.dp)
                 )
             },
             title = {
                 Text(
-                    text = "هشدار بک‌آپ قابل حمل (بدون رمزنگاری)",
+                    text = "هشدار امنیتی",
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    color = MaterialTheme.colorScheme.error
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "این فایل بدون رمزنگاری است و حاوی تمام اطلاعات مالی شماست. فقط در محل امن نگه دارید.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "مزیت این فایل: در صورت حذف و نصب مجدد برنامه یا جابه‌جایی به دستگاه دیگر، به سادگی و بدون وابستگی به کلید دستگاه قابل بازیابی است.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = "این فایل رمزنگاری نشده و حاوی تمام اطلاعات مالی شماست. فقط در محل امن نگه دارید.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    lineHeight = 22.sp
+                )
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        showPlainJsonWarningDialog = false
-                        try {
-                            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                            val defaultFileName = "jeebban_backup_$timestamp.json"
-                            createJsonDocumentLauncher.launch(defaultFileName)
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "برنامه ذخیره فایل در دسترس نیست: ${e.message}", Toast.LENGTH_LONG).show()
-                        }
+                        showPlainWarningDialog = false
+                        showPlainExportOptionsDialog = true
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("تأیید و ذخیره JSON")
+                    Text("تأیید و ساخت")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showPlainJsonWarningDialog = false }) {
+                TextButton(onClick = { showPlainWarningDialog = false }) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
+
+    // Options for Portable JSON Backup after Confirmation
+    if (showPlainExportOptionsDialog) {
+        AlertDialog(
+            onDismissRequest = { showPlainExportOptionsDialog = false },
+            title = {
+                Text(
+                    text = "ذخیره بک‌آپ قابل حمل (JSON)",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            showPlainExportOptionsDialog = false
+                            try {
+                                val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                                val defaultFileName = "jeebban_backup_$timestamp.json"
+                                createJsonDocumentLauncher.launch(defaultFileName)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "برنامه ذخیره فایل در دسترس نیست: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("💾 ذخیره به صورت فایل (.json)")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            showPlainExportOptionsDialog = false
+                            coroutineScope.launch {
+                                try {
+                                    val json = viewModel.generatePlainBackupJson()
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText("JeebBan Portable Backup", json)
+                                    clipboard?.setPrimaryClip(clip)
+                                    Toast.makeText(context, "متن پشتیبان با موفقیت در کلیپ‌بورد کپی شد", Toast.LENGTH_LONG).show()
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "خطا در کپی: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("📋 کپی مستقیم متن JSON در کلیپ‌بورد")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            showPlainExportOptionsDialog = false
+                            coroutineScope.launch {
+                                try {
+                                    val json = viewModel.generatePlainBackupJson()
+                                    val sendIntent = android.content.Intent().apply {
+                                        action = android.content.Intent.ACTION_SEND
+                                        putExtra(android.content.Intent.EXTRA_TEXT, json)
+                                        type = "text/plain"
+                                    }
+                                    val shareIntent = android.content.Intent.createChooser(sendIntent, "اشتراک‌گذاری نسخه پشتیبان JSON")
+                                    context.startActivity(shareIntent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "خطا در اشتراک‌گذاری: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("📤 اشتراک‌گذاری متن JSON")
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showPlainExportOptionsDialog = false }) {
                     Text("انصراف")
                 }
             }
@@ -767,33 +849,6 @@ fun SettingsScreen(
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (state.pendingRestoreIsLegacy) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = "⚠️ فایل بکاپ قدیمی (رمزنگاری‌نشده) است",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    } else {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = "🔒 فایل بکاپ رمزنگاری‌شده امن (.ftb)",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
                     Text(
                         text = "هشدار مهم:",
                         fontWeight = FontWeight.Bold,
